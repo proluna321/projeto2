@@ -17,9 +17,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const switchCameraBtn = document.getElementById('switchCamera');
     const exitCameraBtn = document.getElementById('exitCamera');
     const mediaContainer = document.querySelector('.media-container');
+
+    // Elementos dos filtros
     const filtersContainer = document.getElementById('filtersContainer');
     const filterBtns = document.querySelectorAll('.filter-btn');
     const filterIntensity = document.getElementById('filterIntensity');
+
+    // Elementos do editor de texto
     const textToolbar = document.getElementById('textToolbar');
     const textColor = document.getElementById('textColor');
     const changeFont = document.getElementById('changeFont');
@@ -43,106 +47,157 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentFilterIntensity = 100;
     let isCameraActive = false;
     let currentFacingMode = 'environment';
-    let textElementsData = []; // Armazena dados normalizados dos textos
 
     // Função para verificar se é dispositivo móvel
     function isMobileDevice() {
         return /Mobi|Android|iPhone|iPad|iPod|Touch/.test(navigator.userAgent);
     }
 
-    // Habilitar botão de texto e filtros quando houver imagem
-    function checkImageForTextAndFilters() {
+    // Habilitar botão de texto quando houver imagem
+    function checkImageForText() {
+        addTextBtn.disabled = !(imagePreview.style.display === 'block');
+    }
+
+    // Mostrar/ocultar filtros quando houver imagem
+    function toggleFilters() {
         const hasImage = imagePreview.style.display === 'block';
-        addTextBtn.disabled = !hasImage;
         filtersContainer.style.display = hasImage ? 'block' : 'none';
     }
 
     // Observar mudanças na imagem
-    const observer = new MutationObserver(checkImageForTextAndFilters);
+    const observer = new MutationObserver(function() {
+        checkImageForText();
+        toggleFilters();
+    });
     observer.observe(imagePreview, { attributes: true, attributeFilter: ['style'] });
     observer.observe(cameraView, { attributes: true, attributeFilter: ['style'] });
 
-    // Ajustar orientação da câmera
+    // Função para ajustar a orientação da câmera
     function adjustCameraOrientation() {
         if (!isCameraActive || !isMobileDevice()) return;
+
         const isLandscape = window.innerWidth > window.innerHeight;
-        cameraView.classList.toggle('landscape', isLandscape);
-        cameraView.style.objectFit = isLandscape ? 'cover' : 'contain';
-        cameraView.style.transform = 'translate(-50%, -50%)';
+        if (isLandscape) {
+            cameraView.classList.add('landscape');
+            cameraView.style.objectFit = 'cover';
+            cameraView.style.transform = 'translate(-50%, -50%)';
+        } else {
+            cameraView.classList.remove('landscape');
+            cameraView.style.objectFit = 'contain';
+            cameraView.style.transform = 'translate(-50%, -50%)';
+        }
     }
 
-    // Atualizar posições normalizadas dos textos
-    function updateTextPositions() {
+    // Função para ajustar a posição do texto na mudança de orientação
+    function adjustTextPosition() {
+        if (!isMobileDevice()) return;
+
+        const textElements = document.querySelectorAll('.draggable-text');
+        if (textElements.length === 0) return;
+
+        const containerRect = mediaContainer.getBoundingClientRect();
         const imgPreviewRect = imagePreview.getBoundingClientRect();
-        textElementsData.forEach((data, index) => {
-            const textElement = document.querySelectorAll('.draggable-text')[index];
-            if (textElement) {
-                textElement.style.left = `${data.x * 100}%`;
-                textElement.style.top = `${data.y * 100}%`;
+
+        textElements.forEach(textElement => {
+            const leftPercent = parseFloat(textElement.dataset.leftPercent || textElement.style.left) / 100;
+            const topPercent = parseFloat(textElement.dataset.topPercent || textElement.style.top) / 100;
+
+            const isImageMode = imagePreview.style.display === 'block';
+            const referenceRect = isImageMode ? imgPreviewRect : containerRect;
+
+            let newLeft = leftPercent * referenceRect.width;
+            let newTop = topPercent * referenceRect.height;
+
+            if (isImageMode) {
+                newLeft += referenceRect.left - containerRect.left;
+                newTop += referenceRect.top - containerRect.top;
             }
+
+            textElement.style.left = `${(newLeft / containerRect.width) * 100}%`;
+            textElement.style.top = `${(newTop / containerRect.height) * 100}%`;
+            textElement.dataset.leftPercent = (newLeft / containerRect.width) * 100;
+            textElement.dataset.topPercent = (newTop / containerRect.height) * 100;
         });
     }
 
-    // Evento de mudança de orientação ou redimensionamento
+    // Evento de mudança de orientação
     if (isMobileDevice()) {
         window.addEventListener('orientationchange', () => {
-            adjustCameraOrientation();
-            updateTextPositions();
+            setTimeout(() => {
+                adjustCameraOrientation();
+                adjustTextPosition();
+            }, 100); // Pequeno delay para garantir que o DOM esteja atualizado
         });
         window.addEventListener('resize', () => {
-            adjustCameraOrientation();
-            updateTextPositions();
+            setTimeout(() => {
+                adjustCameraOrientation();
+                adjustTextPosition();
+            }, 100);
         });
     }
 
     // ========== FUNCIONALIDADES DE TEXTO ==========
-    function addTextElement(initialText, xNorm = 0.5, yNorm = 0.5) {
+    // Adicionar novo texto
+    addTextBtn.addEventListener('click', (e) => {
+        const existingText = document.querySelector('.draggable-text');
+        if (existingText) {
+            return;
+        }
+
+        const isMobile = isMobileDevice();
+        let x = '50%';
+        let y = '50%';
+        
+        if (isMobile && e.type === 'touchstart') {
+            const touch = e.touches[0];
+            const rect = imagePreview.getBoundingClientRect();
+            x = `${((touch.clientX - rect.left) / rect.width) * 100}%`;
+            y = `${((touch.clientY - rect.top) / rect.height) * 100}%`;
+        }
+        
+        addTextElement('', x, y);
+    });
+
+    // Criar elemento de texto
+    function addTextElement(initialText, x = '50%', y = '50%') {
         const textElement = document.createElement('div');
         textElement.className = 'draggable-text text-active';
         textElement.contentEditable = true;
-        textElement.textContent = initialText || 'Texto';
+        textElement.textContent = initialText;
         textElement.style.color = textColor.value;
         textElement.style.fontSize = '24px';
         textElement.style.fontFamily = fonts[currentFontIndex];
         textElement.style.textAlign = alignments[currentAlignIndex].name;
-        textElement.style.left = `${xNorm * 100}%`;
-        textElement.style.top = `${yNorm * 100}%`;
+        textElement.style.left = x;
+        textElement.style.top = y;
         textElement.style.transform = 'translate(-50%, -50%)';
         textElement.style.whiteSpace = 'pre-wrap';
+        textElement.dataset.leftPercent = parseFloat(x);
+        textElement.dataset.topPercent = parseFloat(y);
 
-        // Armazenar dados normalizados
-        textElementsData.push({
-            x: xNorm,
-            y: yNorm,
-            text: initialText || 'Texto',
-            color: textColor.value,
-            fontSize: 24,
-            fontFamily: fonts[currentFontIndex],
-            textAlign: alignments[currentAlignIndex].name,
-            scale: 1,
-            rotation: 0
-        });
-
-        makeTextManipulable(textElement, textElementsData.length - 1);
+        makeTextManipulable(textElement);
 
         textElement.addEventListener('click', (e) => {
             e.stopPropagation();
-            selectTextElement(textElement, textElementsData.length - 1);
-            if (isMobileDevice()) textElement.focus();
+            selectTextElement(textElement);
+            if (isMobileDevice()) {
+                textElement.focus();
+            }
         });
 
         textElement.addEventListener('touchstart', (e) => {
             e.stopPropagation();
-            selectTextElement(textElement, textElementsData.length - 1);
+            selectTextElement(textElement);
             textElement.focus();
         }, { passive: false });
 
         mediaContainer.appendChild(textElement);
-        selectTextElement(textElement, textElementsData.length - 1);
+        selectTextElement(textElement);
         textElement.focus();
     }
 
-    function selectTextElement(element, index) {
+    // Selecionar elemento de texto
+    function selectTextElement(element) {
         if (activeTextElement) {
             activeTextElement.classList.remove('text-active');
             activeTextElement.contentEditable = false;
@@ -152,44 +207,72 @@ document.addEventListener('DOMContentLoaded', function() {
         element.contentEditable = true;
         textToolbar.style.display = 'block';
 
-        const data = textElementsData[index];
-        textColor.value = rgbToHex(data.color) || '#000000';
-        currentFontIndex = fonts.indexOf(data.fontFamily);
+        textColor.value = rgbToHex(element.style.color) || '#000000';
+        const fontFamily = element.style.fontFamily || 'Arial';
+        currentFontIndex = fonts.indexOf(fontFamily);
         if (currentFontIndex === -1) currentFontIndex = 0;
         changeFont.textContent = fonts[currentFontIndex];
-        currentAlignIndex = alignments.findIndex(align => align.name === data.textAlign);
+        const textAlign = element.style.textAlign || 'center';
+        currentAlignIndex = alignments.findIndex(align => align.name === textAlign);
         if (currentAlignIndex === -1) currentAlignIndex = 0;
         changeAlign.innerHTML = `<i class="fas ${alignments[currentAlignIndex].icon}"></i>`;
     }
 
-    function makeTextManipulable(element, index) {
+    // Tornar elemento manipulável
+    function makeTextManipulable(element) {
         let isDragging = false;
         let isPinching = false;
         let initialX = 0;
         let initialY = 0;
+        let currentX = 0;
+        let currentY = 0;
         let initialDistance = 0;
         let initialAngle = 0;
+        let currentScale = 1;
+        let currentRotation = 0;
+
+        function getTransform() {
+            const transform = element.style.transform.match(/scale\(([^)]+)\)|rotate\(([^)]+)\)/g) || [];
+            transform.forEach(t => {
+                if (t.includes('scale')) {
+                    currentScale = parseFloat(t.match(/scale\(([^)]+)\)/)[1]) || 1;
+                }
+                if (t.includes('rotate')) {
+                    currentRotation = parseFloat(t.match(/rotate\(([^)]+)\)/)[1]) || 0;
+                }
+            });
+        }
 
         function startManipulation(e) {
             e.preventDefault();
             e.stopPropagation();
 
             const isMobile = isMobileDevice();
-            const data = textElementsData[index];
+            getTransform();
 
             if (isMobile && e.type === 'touchstart' && e.touches.length === 2) {
                 isPinching = true;
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
-                initialDistance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-                initialAngle = Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX);
+                initialDistance = Math.hypot(
+                    touch1.clientX - touch2.clientX,
+                    touch1.clientY - touch2.clientY
+                );
+                initialAngle = Math.atan2(
+                    touch2.clientY - touch1.clientY,
+                    touch2.clientX - touch1.clientX
+                );
                 element.classList.add('dragging');
             } else if (e.type === 'touchstart' || e.type === 'mousedown') {
                 isDragging = true;
                 const event = e.type === 'touchstart' ? e.touches[0] : e;
-                const rect = imagePreview.getBoundingClientRect();
-                initialX = event.clientX - (data.x * rect.width + rect.left);
-                initialY = event.clientY - (data.y * rect.height + rect.top);
+                const rect = mediaContainer.getBoundingClientRect();
+                const leftPercent = parseFloat(element.dataset.leftPercent || element.style.left) / 100;
+                const topPercent = parseFloat(element.dataset.topPercent || element.style.top) / 100;
+                currentX = leftPercent * rect.width;
+                currentY = topPercent * rect.height;
+                initialX = event.clientX - currentX;
+                initialY = event.clientY - currentY;
                 element.classList.add('dragging');
             }
 
@@ -204,34 +287,50 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             e.stopPropagation();
 
-            const rect = imagePreview.getBoundingClientRect();
-            const data = textElementsData[index];
+            const rect = mediaContainer.getBoundingClientRect();
+            const elementRect = element.getBoundingClientRect();
 
             if (isPinching && e.type === 'touchmove' && e.touches.length === 2) {
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
-                const currentDistance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-                const currentAngle = Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX);
+                const currentDistance = Math.hypot(
+                    touch1.clientX - touch2.clientX,
+                    touch1.clientY - touch2.clientY
+                );
+                const currentAngle = Math.atan2(
+                    touch2.clientY - touch1.clientY,
+                    touch2.clientX - touch1.clientX
+                );
 
                 const scaleFactor = currentDistance / initialDistance;
-                data.scale = Math.max(0.5, Math.min(data.scale * scaleFactor, 3));
+                const newScale = Math.max(0.5, Math.min(currentScale * scaleFactor, 3));
                 const angleDiff = (currentAngle - initialAngle) * (180 / Math.PI);
-                data.rotation = (data.rotation + angleDiff) % 360;
+                const newRotation = currentRotation + angleDiff;
 
-                element.style.transform = `translate(-50%, -50%) scale(${data.scale}) rotate(${data.rotation}deg)`;
+                element.style.transform = `translate(-50%, -50%) scale(${newScale}) rotate(${newRotation}deg)`;
                 initialDistance = currentDistance;
                 initialAngle = currentAngle;
+                currentScale = newScale;
+                currentRotation = newRotation;
             } else if (isDragging) {
                 const event = e.type === 'touchmove' ? e.touches[0] : e;
-                data.x = (event.clientX - initialX - rect.left) / rect.width;
-                data.y = (event.clientY - initialY - rect.top) / rect.height;
+                let newX = event.clientX - initialX;
+                let newY = event.clientY - initialY;
 
-                // Limitar dentro da imagem
-                data.x = Math.max(0, Math.min(data.x, 1));
-                data.y = Math.max(0, Math.min(data.y, 1));
+                const minX = 0;
+                const minY = 0;
+                const maxX = rect.width - elementRect.width;
+                const maxY = rect.height - elementRect.height;
 
-                element.style.left = `${data.x * 100}%`;
-                element.style.top = `${data.y * 100}%`;
+                newX = Math.max(minX, Math.min(newX, maxX));
+                newY = Math.max(minY, Math.min(newY, maxY));
+
+                currentX = newX;
+                currentY = newY;
+                element.style.left = `${(newX / rect.width) * 100}%`;
+                element.style.top = `${(newY / rect.height) * 100}%`;
+                element.dataset.leftPercent = (newX / rect.width) * 100;
+                element.dataset.topPercent = (newY / rect.height) * 100;
             }
         }
 
@@ -258,8 +357,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     textColor.addEventListener('input', () => {
         if (activeTextElement) {
-            const index = Array.from(document.querySelectorAll('.draggable-text')).indexOf(activeTextElement);
-            textElementsData[index].color = textColor.value;
             activeTextElement.style.color = textColor.value;
         }
     });
@@ -268,8 +365,6 @@ document.addEventListener('DOMContentLoaded', function() {
         currentFontIndex = (currentFontIndex + 1) % fonts.length;
         changeFont.textContent = fonts[currentFontIndex];
         if (activeTextElement) {
-            const index = Array.from(document.querySelectorAll('.draggable-text')).indexOf(activeTextElement);
-            textElementsData[index].fontFamily = fonts[currentFontIndex];
             activeTextElement.style.fontFamily = fonts[currentFontIndex];
         }
     });
@@ -278,16 +373,12 @@ document.addEventListener('DOMContentLoaded', function() {
         currentAlignIndex = (currentAlignIndex + 1) % alignments.length;
         changeAlign.innerHTML = `<i class="fas ${alignments[currentAlignIndex].icon}"></i>`;
         if (activeTextElement) {
-            const index = Array.from(document.querySelectorAll('.draggable-text')).indexOf(activeTextElement);
-            textElementsData[index].textAlign = alignments[currentAlignIndex].name;
             activeTextElement.style.textAlign = alignments[currentAlignIndex].name;
         }
     });
 
     finishText.addEventListener('click', () => {
         if (activeTextElement) {
-            const index = Array.from(document.querySelectorAll('.draggable-text')).indexOf(activeTextElement);
-            textElementsData[index].text = activeTextElement.textContent;
             activeTextElement.classList.remove('text-active');
             activeTextElement.contentEditable = false;
             activeTextElement = null;
@@ -298,8 +389,6 @@ document.addEventListener('DOMContentLoaded', function() {
     mediaContainer.addEventListener('click', (e) => {
         if (e.target === mediaContainer) {
             if (activeTextElement) {
-                const index = Array.from(document.querySelectorAll('.draggable-text')).indexOf(activeTextElement);
-                textElementsData[index].text = activeTextElement.textContent;
                 activeTextElement.classList.remove('text-active');
                 activeTextElement.contentEditable = false;
                 activeTextElement = null;
@@ -350,6 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     cameraView.style.maxWidth = '100%';
                     cameraView.style.maxHeight = '100%';
                     adjustCameraOrientation();
+                    adjustTextPosition();
                 };
                 
                 showStatus("Câmera ativada. Use os botões para capturar, alternar ou sair.", 'info');
@@ -410,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addTextBtn.disabled = false;
         
         showStatus("Foto capturada. Clique em 'Enviar para o Drive'.", 'info');
-        updateTextPositions();
+        adjustTextPosition();
     });
 
     switchCameraBtn.addEventListener('click', async () => {
@@ -439,6 +529,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cameraView.style.maxWidth = '100%';
                 cameraView.style.maxHeight = '100%';
                 adjustCameraOrientation();
+                adjustTextPosition();
             };
             
             showStatus(`Câmera alternada para ${currentFacingMode === 'environment' ? 'traseira' : 'frontal'}.`, 'info');
@@ -461,6 +552,7 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBtn.disabled = true;
         addTextBtn.disabled = true;
         resetStatus();
+        adjustTextPosition();
     });
 
     chooseFileBtn.addEventListener('click', () => {
@@ -490,7 +582,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 addTextBtn.disabled = false;
                 
                 showStatus("Imagem selecionada. Clique em 'Enviar para o Drive'.", 'info');
-                updateTextPositions();
+                adjustTextPosition();
             };
             reader.readAsDataURL(file);
         } else {
@@ -527,26 +619,6 @@ document.addEventListener('DOMContentLoaded', function() {
         applyFilter();
     });
 
-    addTextBtn.addEventListener('click', (e) => {
-        const existingText = document.querySelector('.draggable-text');
-        if (existingText) return;
-
-        const isMobile = isMobileDevice();
-        let xNorm = 0.5;
-        let yNorm = 0.5;
-        
-        if (isMobile && e.type === 'touchstart') {
-            const touch = e.touches[0];
-            const rect = imagePreview.getBoundingClientRect();
-            xNorm = (touch.clientX - rect.left) / rect.width;
-            yNorm = (touch.clientY - rect.top) / rect.height;
-            xNorm = Math.max(0, Math.min(xNorm, 1));
-            yNorm = Math.max(0, Math.min(yNorm, 1));
-        }
-        
-        addTextElement('', xNorm, yNorm);
-    });
-
     uploadBtn.addEventListener('click', async () => {
         if (!currentImage) {
             showError("Nenhuma imagem para enviar");
@@ -575,31 +647,50 @@ document.addEventListener('DOMContentLoaded', function() {
             ctx.filter = imagePreview.style.filter || 'none';
             ctx.drawImage(img, 0, 0);
             
-            textElementsData.forEach(data => {
-                const x = data.x * canvas.width;
-                const y = data.y * canvas.height;
-                const scaledFontSize = data.fontSize * Math.min(canvas.width / imagePreview.getBoundingClientRect().width, canvas.height / imagePreview.getBoundingClientRect().height);
+            const containerRect = mediaContainer.getBoundingClientRect();
+            const imgPreviewRect = imagePreview.getBoundingClientRect();
+            
+            const scaleX = canvas.width / imgPreviewRect.width;
+            const scaleY = canvas.height / imgPreviewRect.height;
+            
+            const textElements = document.querySelectorAll('.draggable-text');
+            textElements.forEach(textElement => {
+                const text = textElement.textContent;
+                const color = textElement.style.color || '#000000';
+                const fontSize = parseInt(textElement.style.fontSize) || 24;
+                const fontFamily = textElement.style.fontFamily || 'Arial';
+                const textAlign = textElement.style.textAlign || 'center';
                 
-                ctx.font = `${scaledFontSize}px ${data.fontFamily}`;
-                ctx.fillStyle = data.color;
-                ctx.textAlign = data.textAlign;
+                // Use dataset for consistent positioning
+                const leftPercent = parseFloat(textElement.dataset.leftPercent || textElement.style.left) / 100;
+                const topPercent = parseFloat(textElement.dataset.topPercent || textElement.style.top) / 100;
+                
+                const x = leftPercent * canvas.width;
+                const y = topPercent * canvas.height;
+                const scaledFontSize = fontSize * Math.min(scaleX, scaleY);
+                
+                ctx.font = `${scaledFontSize}px ${fontFamily}`;
+                ctx.fillStyle = color;
+                ctx.textAlign = textAlign;
                 ctx.textBaseline = 'middle';
-                
-                // Ajustar para o translate(-50%, -50%)
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = canvas.width;
-                tempCanvas.height = canvas.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.font = ctx.font;
-                const textMetrics = tempCtx.measureText(data.text);
-                const textWidth = textMetrics.width;
-                const textHeight = scaledFontSize; // Aproximação da altura do texto
-                
+
+                const transform = textElement.style.transform.match(/scale\(([^)]+)\)|rotate\(([^)]+)\)/g) || [];
+                let scale = 1;
+                let rotation = 0;
+                transform.forEach(t => {
+                    if (t.includes('scale')) {
+                        scale = parseFloat(t.match(/scale\(([^)]+)\)/)[1]) || 1;
+                    }
+                    if (t.includes('rotate')) {
+                        rotation = parseFloat(t.match(/rotate\(([^)]+)\)/)[1]) || 0;
+                    }
+                });
+
                 ctx.save();
                 ctx.translate(x, y);
-                ctx.rotate(data.rotation * Math.PI / 180);
-                ctx.scale(data.scale, data.scale);
-                ctx.fillText(data.text, -textWidth / 2, 0);
+                ctx.rotate(rotation * Math.PI / 180);
+                ctx.scale(scale, scale);
+                ctx.fillText(text, 0, 0);
                 ctx.restore();
             });
             
@@ -640,8 +731,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function showStatus(message, type = 'info') {
         statusDiv.textContent = message;
         statusDiv.className = 'status';
-        if (type === 'success') statusDiv.classList.add('success');
-        else if (type === 'error') statusDiv.classList.add('error');
+        
+        if (type === 'success') {
+            statusDiv.classList.add('success');
+        } else if (type === 'error') {
+            statusDiv.classList.add('error');
+        }
+        
         statusDiv.style.display = 'block';
     }
 
@@ -663,18 +759,21 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBtn.disabled = true;
         addTextBtn.disabled = true;
         fileInput.value = '';
+        
         document.querySelectorAll('.draggable-text').forEach(el => el.remove());
-        textElementsData = [];
         textToolbar.style.display = 'none';
+        
         imagePreview.style.filter = 'none';
         currentFilter = 'none';
         filterBtns.forEach(b => b.classList.remove('active'));
         document.querySelector('.filter-btn[data-filter="none"]').classList.add('active');
         filterIntensity.value = 100;
+        
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
         }
+        
         isCameraActive = false;
     }
 
