@@ -563,6 +563,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 cameraMenu.style.display = 'none';
                 mediaContainer.classList.remove('fullscreen');
                 
+                // Quando a imagem terminar de carregar
+                imagePreview.onload = function() {
+                    adjustTextToImage();
+                };
+                
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                     stream = null;
@@ -572,13 +577,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 addTextBtn.disabled = false;
                 
                 showStatus("Imagem selecionada. Clique em 'Enviar para o Drive'.", 'info');
-                adjustTextPosition();
             };
             reader.readAsDataURL(file);
         } else {
             showError("Por favor, selecione um arquivo de imagem válido.");
         }
     });
+
+    // Função para ajustar o texto quando a imagem é carregada
+    function adjustTextToImage() {
+        const textElements = document.querySelectorAll('.draggable-text');
+        if (textElements.length === 0) return;
+
+        const imgRect = imagePreview.getBoundingClientRect();
+        const containerRect = mediaContainer.getBoundingClientRect();
+
+        textElements.forEach(textElement => {
+            // Manter a posição relativa à imagem
+            const leftPercent = parseFloat(textElement.style.left) / 100;
+            const topPercent = parseFloat(textElement.style.top) / 100;
+            
+            // Ajustar para a nova posição da imagem
+            const newLeft = leftPercent * containerRect.width;
+            const newTop = topPercent * containerRect.height;
+            
+            textElement.style.left = `${(newLeft / containerRect.width) * 100}%`;
+            textElement.style.top = `${(newTop / containerRect.height) * 100}%`;
+        });
+    }
 
     filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -637,14 +663,14 @@ document.addEventListener('DOMContentLoaded', function() {
             ctx.filter = imagePreview.style.filter || 'none';
             ctx.drawImage(img, 0, 0);
             
-            const containerRect = mediaContainer.getBoundingClientRect();
-            const imgPreviewRect = imagePreview.getBoundingClientRect();
+            // Obter as dimensões reais da imagem exibida
+            const imgRect = imagePreview.getBoundingClientRect();
+            const imgNaturalWidth = img.naturalWidth;
+            const imgNaturalHeight = img.naturalHeight;
             
-            const offsetX = (containerRect.width - imgPreviewRect.width) / 2;
-            const offsetY = (containerRect.height - imgPreviewRect.height) / 2;
-            
-            const scaleX = canvas.width / imgPreviewRect.width;
-            const scaleY = canvas.height / imgPreviewRect.height;
+            // Fator de escala entre a imagem exibida e a imagem original
+            const scaleX = imgNaturalWidth / imgRect.width;
+            const scaleY = imgNaturalHeight / imgRect.height;
             
             const textElements = document.querySelectorAll('.draggable-text');
             textElements.forEach(textElement => {
@@ -654,13 +680,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 const fontFamily = textElement.style.fontFamily || 'Arial';
                 const textAlign = textElement.style.textAlign || 'center';
                 
+                // Obter a posição relativa à imagem
                 const textRect = textElement.getBoundingClientRect();
+                const imgRect = imagePreview.getBoundingClientRect();
                 
-                const relativeX = textRect.left - imgPreviewRect.left + (textRect.width / 2);
-                const relativeY = textRect.top - imgPreviewRect.top + (textRect.height / 2);
+                // Calcular a posição relativa à imagem exibida
+                const relativeX = (textRect.left + textRect.width/2 - imgRect.left);
+                const relativeY = (textRect.top + textRect.height/2 - imgRect.top);
                 
+                // Converter para posição na imagem original
                 const x = relativeX * scaleX;
                 const y = relativeY * scaleY;
+                
+                // Ajustar o tamanho da fonte proporcionalmente
                 const scaledFontSize = fontSize * Math.min(scaleX, scaleY);
                 
                 ctx.font = `${scaledFontSize}px ${fontFamily}`;
@@ -668,6 +700,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.textAlign = textAlign;
                 ctx.textBaseline = 'middle';
 
+                // Aplicar transformações (escala e rotação)
                 const transform = textElement.style.transform.match(/scale\(([^)]+)\)|rotate\(([^)]+)\)/g) || [];
                 let scale = 1;
                 let rotation = 0;
