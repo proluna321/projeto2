@@ -102,32 +102,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const containerRect = mediaContainer.getBoundingClientRect();
         const imgPreviewRect = imagePreview.getBoundingClientRect();
-        const isImageMode = imagePreview.style.display === 'block';
-
-        if (!isImageMode) return;
-
-        const img = new Image();
-        img.src = imagePreview.src;
-        const isVertical = isVerticalImage(img);
 
         textElements.forEach(textElement => {
             const leftPercent = parseFloat(textElement.style.left) / 100;
             const topPercent = parseFloat(textElement.style.top) / 100;
 
-            const referenceRect = imgPreviewRect;
-            let newLeft, newTop;
+            const isImageMode = imagePreview.style.display === 'block';
+            const referenceRect = isImageMode ? imgPreviewRect : containerRect;
 
-            if (isVertical) {
-                // Para imagens verticais, manter posição relativa à imagem
-                const scaleX = referenceRect.width / img.width;
-                const scaleY = referenceRect.height / img.height;
-                const scale = Math.min(scaleX, scaleY);
-                newLeft = (leftPercent * img.width * scale) + (referenceRect.left - containerRect.left);
-                newTop = (topPercent * img.height * scale) + (referenceRect.top - containerRect.top);
-            } else {
-                // Para imagens horizontais, manter comportamento original
-                newLeft = leftPercent * referenceRect.width + (referenceRect.left - containerRect.left);
-                newTop = topPercent * referenceRect.height + (referenceRect.top - containerRect.top);
+            let newLeft = leftPercent * referenceRect.width;
+            let newTop = topPercent * referenceRect.height;
+
+            if (isImageMode) {
+                const img = new Image();
+                img.src = imagePreview.src;
+                const isVertical = img.height > img.width;
+                if (isVertical) {
+                    // Ajustar para manter a proporção exata da imagem vertical
+                    const scaleX = referenceRect.width / img.width;
+                    const scaleY = referenceRect.height / img.height;
+                    const scale = Math.min(scaleX, scaleY);
+                    newLeft = (leftPercent * img.width * scale) + (referenceRect.left - containerRect.left);
+                    newTop = (topPercent * img.height * scale) + (referenceRect.top - containerRect.top);
+                } else {
+                    newLeft += referenceRect.left - containerRect.left;
+                    newTop += referenceRect.top - containerRect.top;
+                }
             }
 
             textElement.style.left = `${(newLeft / containerRect.width) * 100}%`;
@@ -139,11 +139,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (isMobileDevice()) {
         window.addEventListener('orientationchange', () => {
             adjustCameraOrientation();
-            setTimeout(adjustTextPosition, 100); // Atraso para garantir que o DOM esteja atualizado
+            adjustTextPosition();
         });
         window.addEventListener('resize', () => {
             adjustCameraOrientation();
-            setTimeout(adjustTextPosition, 100);
+            adjustTextPosition();
         });
     }
 
@@ -648,22 +648,32 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const isVertical = isVerticalImage(img);
+            const aspectRatio = img.width / img.height;
             
-            // Definir dimensões do canvas para corresponder à imagem
-            canvas.width = img.width;
-            canvas.height = img.height;
+            // Ajustar dimensões do canvas para manter a proporção da imagem
+            if (isVertical) {
+                canvas.height = img.height;
+                canvas.width = img.width;
+            } else {
+                canvas.width = img.width;
+                canvas.height = img.height;
+            }
             
             const ctx = canvas.getContext('2d');
             ctx.filter = imagePreview.style.filter || 'none';
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             
-            const imgPreviewRect = imagePreview.getBoundingClientRect();
             const containerRect = mediaContainer.getBoundingClientRect();
+            const imgPreviewRect = imagePreview.getBoundingClientRect();
             
             // Calcular escala para mapear coordenadas da visualização para o canvas
-            const scaleX = canvas.width / img.width;
-            const scaleY = canvas.height / img.height;
+            const scaleX = canvas.width / imgPreviewRect.width;
+            const scaleY = canvas.height / imgPreviewRect.height;
             const scale = isVertical ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
+            
+            // Ajustar offsets para centralizar a imagem no canvas, se necessário
+            const offsetX = isVertical ? 0 : (containerRect.width - imgPreviewRect.width) / 2;
+            const offsetY = isVertical ? 0 : (containerRect.height - imgPreviewRect.height) / 2;
             
             const textElements = document.querySelectorAll('.draggable-text');
             textElements.forEach(textElement => {
@@ -676,14 +686,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const leftPercent = parseFloat(textElement.style.left) / 100;
                 const topPercent = parseFloat(textElement.style.top) / 100;
                 
-                // Calcular posição do texto no canvas
-                let x = leftPercent * canvas.width;
-                let y = topPercent * canvas.height;
-                
+                let x, y;
                 if (isVertical) {
-                    // Para imagens verticais, usar coordenadas relativas à imagem
-                    x = leftPercent * img.width * scale;
-                    y = topPercent * img.height * scale;
+                    // Para imagens verticais, usar proporção exata da imagem
+                    x = leftPercent * canvas.width;
+                    y = topPercent * canvas.height;
                 } else {
                     // Para imagens horizontais, manter comportamento original
                     const textRect = textElement.getBoundingClientRect();
