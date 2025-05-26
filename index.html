@@ -1,80 +1,99 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enviar Foto para o Drive</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <title>PixelHug</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="container">
         <h1><i class="fas fa-camera"></i> Enviar Foto para o Drive</h1>
         
-        <div class="button-container">
-            <div class="button-row">
-                <button id="toggleCamera" class="btn btn-primary" title="Abrir Câmera"><i class="fas fa-camera"></i></button>
-                <button id="chooseFile" class="btn btn-secondary" title="Escolher Imagem"><i class="fas fa-file-image"></i></button>
-                <button id="addTextBtn" class="btn btn-accent" title="Adicionar Texto"><i class="fas fa-font"></i></button>
-            </div>
-        </div>
-
         <div class="media-container">
-            <div class="placeholder" id="placeholder">
+            <video id="cameraView" autoplay playsinline muted></video>
+            <img id="imagePreview" alt="Pré-visualização da imagem">
+            <div id="placeholder" class="placeholder">
                 <i class="fas fa-image"></i>
                 <p>Nenhuma imagem selecionada</p>
             </div>
-            <video id="cameraView" autoplay playsinline></video>
-            <img id="imagePreview" src="" alt="Pré-visualização da Imagem">
-            <input type="file" id="fileInput" accept="image/*">
+            <div id="realTimeText"></div>
         </div>
 
-        <div class="camera-menu" id="cameraMenu">
-            <div class="camera-controls">
-                <button id="capturePhoto" class="btn btn-primary" title="Capturar Foto"><i class="fas fa-camera"></i></button>
-                <button id="switchCamera" class="btn btn-secondary" title="Alternar Câmera"><i class="fas fa-sync-alt"></i></button>
-                <button id="exitCamera" class="btn btn-danger" title="Sair da Câmera"><i class="fas fa-times"></i></button>
+        <div class="button-container">
+            <div class="button-row">
+                <button id="toggleCamera" class="btn btn-primary"><i class="fas fa-video"></i></button>
+                <button id="chooseFile" class="btn btn-secondary"><i class="fas fa-upload"></i></button>
+                <button id="addTextBtn" class="btn btn-accent" disabled><i class="fas fa-font"></i></button>
+            </div>
+            <div class="upload-button-container">
+                <button id="uploadBtn" class="btn btn-success" disabled>
+                    <i class="fas fa-cloud-upload-alt"></i> Concluir
+                </button>
             </div>
         </div>
 
-        <div class="text-toolbar" id="textToolbar" style="display: none;">
-            <div class="text-controls">
-                <input type="color" id="textColor" class="color-picker">
-                <button id="changeFont" class="btn-text">Arial</button>
-                <button id="changeAlign" class="btn-text"><i class="fas fa-align-center"></i></button>
-                <button id="finishText" class="btn-text done">Concluir</button>
-            </div>
-        </div>
-
-        <div class="filters-container" id="filtersContainer">
-            <h3><i class="fas fa-sliders-h"></i>Filtros</h3>
+        <div id="filtersContainer" class="filters-container">
+            <h3><i class="fas fa-filter"></i> Filtros</h3>
             <div class="filters-scroll">
-                <div class="filter-btn" data-filter="none"><img src="preview.jpg" class="filter-preview"></div>
-                <div class="filter-btn" data-filter="grayscale(100%)"><img src="https://via.placeholder.com/80" class="filter-preview"></div>
-                <div class="filter-btn" data-filter="sepia(100%)"><img src="https://via.placeholder.com/80" class="filter-preview"></div>
-                <div class="filter-btn" data-filter="brightness(150%)"><img src="https://via.placeholder.com/80" class="filter-preview"></div>
-                <div class="filter-btn" data-filter="contrast(150%)"><img src="https://via.placeholder.com/80" class="filter-preview"></div>
-                <div class="filter-btn" data-filter="saturate(200%)"><img src="https://via.placeholder.com/80" class="filter-preview"></div>
-                <div class="filter-btn" data-filter="hue-rotate(90deg)"><img src="https://via.placeholder.com/80" class="filter-preview"></div>
-                <div class="filter-btn" data-filter="blur(2px)"><img src="https://via.placeholder.com/80" class="filter-preview"></div>
+                <button class="filter-btn active" data-filter="none">
+                    <img class="filter-preview" src="https://via.placeholder.com/80?text=Nenhum">
+                </button>
+                <button class="filter-btn" data-filter="grayscale(100%)">
+                    <img class="filter-preview" src="https://via.placeholder.com/80?text=Grayscale">
+                </button>
+                <button class="filter-btn" data-filter="sepia(100%)">
+                    <img class="filter-preview" src="https://via.placeholder.com/80?text=Sepia">
+                </button>
+                <button class="filter-btn" data-filter="brightness(150%)">
+                    <img class="filter-preview" src="https://via.placeholder.com/80?text=Brightness">
+                </button>
+                <button class="filter-btn" data-filter="contrast(150%)">
+                    <img class="filter-preview" src="https://via.placeholder.com/80?text=Contrast">
+                </button>
+                <button class="filter-btn" data-filter="saturate(200%)">
+                    <img class="filter-preview" src="https://via.placeholder.com/80?text=Saturate">
+                </button>
+                <button class="filter-btn" data-filter="hue-rotate(90deg)">
+                    <img class="filter-preview" src="https://via.placeholder.com/80?text=Hue+Rotate">
+                </button>
+                <button class="filter-btn" data-filter="blur(2px)">
+                    <img class="filter-preview" src="https://via.placeholder.com/80?text=Blur">
+                </button>
             </div>
             <div class="filter-controls">
-                <input type="range" id="filterIntensity" min="0" max="100" value="100" class="filter-slider">
+                <input type="range" id="filterIntensity" class="filter-slider" min="0" max="200" value="100">
             </div>
         </div>
 
-        <div class="upload-button-container">
-            <button id="uploadBtn" class="btn btn-success" disabled><i class="fas fa-cloud-upload-alt"></i> Enviar</button>
-        </div>
-
-        <div class="status" id="status"></div>
-        <div class="progress-container" id="progressContainer">
-            <div class="progress-bar" id="progressBar"></div>
-            <div class="progress-text" id="progressText">0%</div>
+        <div id="status" class="status"></div>
+        <div id="progressContainer" class="progress-container">
+            <div id="progressBar" class="progress-bar">
+                <span id="progressText" class="progress-text">0%</span>
+            </div>
         </div>
     </div>
 
+    <div id="cameraMenu" class="camera-menu">
+        <div class="camera-controls">
+            <button id="capturePhoto" class="btn btn-success"><i class="fas fa-camera"></i></button>
+            <button id="switchCamera" class="btn btn-primary"><i class="fas fa-sync-alt"></i></button>
+            <button id="exitCamera" class="btn btn-danger"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <div id="textToolbar" class="text-toolbar">
+        <div class="text-controls">
+            <input type="color" id="textColor" class="color-picker" value="#000000">
+            <button id="changeFont" class="btn-text">Arial</button>
+            <button id="changeAlign" class="btn-text"><i class="fas fa-align-center"></i></button>
+            <button id="finishText" class="btn-text done">Concluído</button>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*">
+
     <script src="script.js"></script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'945bca385d9311e6',t:'MTc0ODI0Njk2Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>

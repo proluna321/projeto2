@@ -72,6 +72,64 @@ document.addEventListener('DOMContentLoaded', function() {
     observer.observe(imagePreview, { attributes: true, attributeFilter: ['style'] });
     observer.observe(cameraView, { attributes: true, attributeFilter: ['style'] });
 
+    // Função para ajustar a orientação da câmera
+    function adjustCameraOrientation() {
+        if (!isCameraActive || !isMobileDevice()) return;
+
+        const isLandscape = window.innerWidth > window.innerHeight;
+        if (isLandscape) {
+            cameraView.classList.add('landscape');
+            cameraView.style.objectFit = 'cover';
+            cameraView.style.transform = 'translate(-50%, -50%)';
+        } else {
+            cameraView.classList.remove('landscape');
+            cameraView.style.objectFit = 'contain';
+            cameraView.style.transform = 'translate(-50%, -50%)';
+        }
+    }
+
+    // Função para ajustar a posição do texto na mudança de orientação
+    function adjustTextPosition() {
+        if (!isMobileDevice()) return;
+
+        const textElements = document.querySelectorAll('.draggable-text');
+        if (textElements.length === 0) return;
+
+        const containerRect = mediaContainer.getBoundingClientRect();
+        const imgPreviewRect = imagePreview.getBoundingClientRect();
+
+        textElements.forEach(textElement => {
+            const leftPercent = parseFloat(textElement.style.left) / 100;
+            const topPercent = parseFloat(textElement.style.top) / 100;
+
+            const isImageMode = imagePreview.style.display === 'block';
+            const referenceRect = isImageMode ? imgPreviewRect : containerRect;
+
+            let newLeft = leftPercent * referenceRect.width;
+            let newTop = topPercent * referenceRect.height;
+
+            if (isImageMode) {
+                newLeft += referenceRect.left - containerRect.left;
+                newTop += referenceRect.top - containerRect.top;
+            }
+
+            textElement.style.left = `${(newLeft / containerRect.width) * 100}%`;
+            textElement.style.top = `${(newTop / containerRect.height) * 100}%`;
+        });
+    }
+
+    // Evento de mudança de orientação
+    if (isMobileDevice()) {
+        window.addEventListener('orientationchange', () => {
+            adjustCameraOrientation();
+            adjustTextPosition();
+        });
+        window.addEventListener('resize', () => {
+            adjustCameraOrientation();
+            adjustTextPosition();
+        });
+    }
+
     // ========== FUNCIONALIDADES DE TEXTO ==========
     // Adicionar novo texto
     addTextBtn.addEventListener('click', (e) => {
@@ -86,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (isMobile && e.type === 'touchstart') {
             const touch = e.touches[0];
-            const rect = mediaContainer.getBoundingClientRect();
+            const rect = imagePreview.getBoundingClientRect();
             x = `${((touch.clientX - rect.left) / rect.width) * 100}%`;
             y = `${((touch.clientY - rect.top) / rect.height) * 100}%`;
         }
@@ -200,6 +258,11 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (e.type === 'touchstart' || e.type === 'mousedown') {
                 isDragging = true;
                 const event = e.type === 'touchstart' ? e.touches[0] : e;
+                const rect = mediaContainer.getBoundingClientRect();
+                const leftPercent = parseFloat(element.style.left) / 100;
+                const topPercent = parseFloat(element.style.top) / 100;
+                currentX = leftPercent * rect.width;
+                currentY = topPercent * rect.height;
                 initialX = event.clientX - currentX;
                 initialY = event.clientY - currentY;
                 element.classList.add('dragging');
@@ -237,7 +300,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const newRotation = currentRotation + angleDiff;
 
                 element.style.transform = `translate(-50%, -50%) scale(${newScale}) rotate(${newRotation}deg)`;
- ге
                 initialDistance = currentDistance;
                 initialAngle = currentAngle;
                 currentScale = newScale;
@@ -283,14 +345,12 @@ document.addEventListener('DOMContentLoaded', function() {
         element.addEventListener('dragstart', (e) => e.preventDefault());
     }
 
-    // Atualizar cor em tempo real
     textColor.addEventListener('input', () => {
         if (activeTextElement) {
             activeTextElement.style.color = textColor.value;
         }
     });
 
-    // Mudar fonte
     changeFont.addEventListener('click', () => {
         currentFontIndex = (currentFontIndex + 1) % fonts.length;
         changeFont.textContent = fonts[currentFontIndex];
@@ -299,7 +359,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Mudar alinhamento
     changeAlign.addEventListener('click', () => {
         currentAlignIndex = (currentAlignIndex + 1) % alignments.length;
         changeAlign.innerHTML = `<i class="fas ${alignments[currentAlignIndex].icon}"></i>`;
@@ -308,7 +367,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Finalizar edição
     finishText.addEventListener('click', () => {
         if (activeTextElement) {
             activeTextElement.classList.remove('text-active');
@@ -318,7 +376,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Desselecionar texto ao clicar no container
     mediaContainer.addEventListener('click', (e) => {
         if (e.target === mediaContainer) {
             if (activeTextElement) {
@@ -330,7 +387,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Converter RGB para HEX
     function rgbToHex(rgb) {
         if (!rgb) return '#000000';
         const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
@@ -365,12 +421,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 addTextBtn.disabled = true;
                 
                 isCameraActive = true;
+                adjustCameraOrientation();
                 
                 cameraView.onloadedmetadata = () => {
                     cameraView.style.width = '100%';
                     cameraView.style.height = '100%';
                     cameraView.style.maxWidth = '100%';
                     cameraView.style.maxHeight = '100%';
+                    adjustCameraOrientation();
+                    adjustTextPosition();
                 };
                 
                 showStatus("Câmera ativada. Use os botões para capturar, alternar ou sair.", 'info');
@@ -431,6 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addTextBtn.disabled = false;
         
         showStatus("Foto capturada. Clique em 'Enviar para o Drive'.", 'info');
+        adjustTextPosition();
     });
 
     switchCameraBtn.addEventListener('click', async () => {
@@ -458,6 +518,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 cameraView.style.height = '100%';
                 cameraView.style.maxWidth = '100%';
                 cameraView.style.maxHeight = '100%';
+                adjustCameraOrientation();
+                adjustTextPosition();
             };
             
             showStatus(`Câmera alternada para ${currentFacingMode === 'environment' ? 'traseira' : 'frontal'}.`, 'info');
@@ -480,6 +542,7 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBtn.disabled = true;
         addTextBtn.disabled = true;
         resetStatus();
+        adjustTextPosition();
     });
 
     chooseFileBtn.addEventListener('click', () => {
@@ -509,6 +572,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 addTextBtn.disabled = false;
                 
                 showStatus("Imagem selecionada. Clique em 'Enviar para o Drive'.", 'info');
+                adjustTextPosition();
             };
             reader.readAsDataURL(file);
         } else {
@@ -516,7 +580,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ========== FUNCIONALIDADES DE FILTROS ==========
     filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             filterBtns.forEach(b => b.classList.remove('active'));
@@ -546,7 +609,6 @@ document.addEventListener('DOMContentLoaded', function() {
         applyFilter();
     });
 
-    // ========== FUNCIONALIDADE DE UPLOAD ==========
     uploadBtn.addEventListener('click', async () => {
         if (!currentImage) {
             showError("Nenhuma imagem para enviar");
@@ -568,27 +630,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 img.src = currentImage;
             });
             
-            // Ajustar canvas para considerar devicePixelRatio
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = img.width * dpr;
-            canvas.height = img.height * dpr;
+            canvas.width = img.width;
+            canvas.height = img.height;
             const ctx = canvas.getContext('2d');
-            ctx.scale(dpr, dpr); // Escalar o contexto para alta densidade
             
-            // Aplicar filtro
             ctx.filter = imagePreview.style.filter || 'none';
-            ctx.drawImage(img, 0, 0, img.width, img.height);
+            ctx.drawImage(img, 0, 0);
             
             const containerRect = mediaContainer.getBoundingClientRect();
             const imgPreviewRect = imagePreview.getBoundingClientRect();
             
-            // Calcular escala considerando o tamanho real da imagem no canvas
-            const scaleX = img.width / imgPreviewRect.width;
-            const scaleY = img.height / imgPreviewRect.height;
-            
-            // Calcular o deslocamento da imagem dentro do container
-            const offsetX = (containerRect.width - imgPreviewRect.width) / 2;
-            const offsetY = (containerRect.height - imgPreviewRect.height) / 2;
+            const scaleX = canvas.width / imgPreviewRect.width;
+            const scaleY = canvas.height / imgPreviewRect.height;
             
             const textElements = document.querySelectorAll('.draggable-text');
             textElements.forEach(textElement => {
@@ -599,24 +652,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const textAlign = textElement.style.textAlign || 'center';
                 
                 const textRect = textElement.getBoundingClientRect();
-                
-                // Calcular posição relativa ao container, ajustando translate(-50%, -50%)
-                const relativeX = textRect.left - containerRect.left - offsetX + (textRect.width / 2);
-                const relativeY = textRect.top - containerRect.top - offsetY + (textRect.height / 2);
-                
-                // Escalar posição para o canvas
-                const x = relativeX * scaleX;
-                const y = relativeY * scaleY;
-                
-                // Ajustar tamanho da fonte sem dupla escalagem
-                const scaledFontSize = fontSize * Math.min(scaleX, scaleY) * dpr;
+                const relativeX = (textRect.left - imgPreviewRect.left + (textRect.width / 2)) * scaleX;
+                const relativeY = (textRect.top - imgPreviewRect.top + (textRect.height / 2)) * scaleY;
+                const scaledFontSize = fontSize * Math.min(scaleX, scaleY);
                 
                 ctx.font = `${scaledFontSize}px ${fontFamily}`;
                 ctx.fillStyle = color;
                 ctx.textAlign = textAlign;
                 ctx.textBaseline = 'middle';
 
-                // Aplicar transformação (escala e rotação)
                 const transform = textElement.style.transform.match(/scale\(([^)]+)\)|rotate\(([^)]+)\)/g) || [];
                 let scale = 1;
                 let rotation = 0;
@@ -630,7 +674,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 ctx.save();
-                ctx.translate(x, y);
+                ctx.translate(relativeX, relativeY);
                 ctx.rotate(rotation * Math.PI / 180);
                 ctx.scale(scale, scale);
                 ctx.fillText(text, 0, 0);
@@ -671,7 +715,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ========== FUNÇÕES AUXILIARES ==========
     function showStatus(message, type = 'info') {
         statusDiv.textContent = message;
         statusDiv.className = 'status';
@@ -738,6 +781,7 @@ document.addEventListener('DOMContentLoaded', function() {
         progressText.textContent = `${Math.round(percent)}%`;
     }
 
+    // Inicializar
     addTextBtn.disabled = true;
     uploadBtn.disabled = true;
 });
