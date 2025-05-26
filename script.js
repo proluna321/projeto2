@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Adjust text position relative to image
     function adjustTextPosition() {
         const textElements = document.querySelectorAll('.draggable-text');
-        if (textElements.length === 0 || !imagePreview.style.display === 'block') return;
+        if (textElements.length === 0 || imagePreview.style.display !== 'block') return;
 
         const imgPreviewRect = imagePreview.getBoundingClientRect();
 
@@ -628,9 +628,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const x = (leftPercent / 100) * canvas.width;
                 const y = (topPercent / 100) * canvas.height;
-                const scaledFontSize = fontSize * (canvas.width / imagePreview.getBoundingClientRect().width);
                 
-                ctx.font = `${scaledFontSize}px ${fontFamily}`;
+                ctx.font = `${fontSize}px ${fontFamily}`;
                 ctx.fillStyle = color;
                 ctx.textAlign = textAlign;
                 ctx.textBaseline = 'middle';
