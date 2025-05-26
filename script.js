@@ -72,11 +72,6 @@ document.addEventListener('DOMContentLoaded', function() {
     observer.observe(imagePreview, { attributes: true, attributeFilter: ['style'] });
     observer.observe(cameraView, { attributes: true, attributeFilter: ['style'] });
 
-    // Função para verificar se a imagem é vertical
-    function isVerticalImage(img) {
-        return img.height > img.width;
-    }
-
     // Função para ajustar a orientação da câmera
     function adjustCameraOrientation() {
         if (!isCameraActive || !isMobileDevice()) return;
@@ -93,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para ajustar a posição do texto
+    // Função para ajustar a posição do texto na mudança de orientação
     function adjustTextPosition() {
         if (!isMobileDevice()) return;
 
@@ -114,20 +109,8 @@ document.addEventListener('DOMContentLoaded', function() {
             let newTop = topPercent * referenceRect.height;
 
             if (isImageMode) {
-                const img = new Image();
-                img.src = imagePreview.src;
-                const isVertical = img.height > img.width;
-                if (isVertical) {
-                    // Ajustar para manter a proporção exata da imagem vertical
-                    const scaleX = referenceRect.width / img.width;
-                    const scaleY = referenceRect.height / img.height;
-                    const scale = Math.min(scaleX, scaleY);
-                    newLeft = (leftPercent * img.width * scale) + (referenceRect.left - containerRect.left);
-                    newTop = (topPercent * img.height * scale) + (referenceRect.top - containerRect.top);
-                } else {
-                    newLeft += referenceRect.left - containerRect.left;
-                    newTop += referenceRect.top - containerRect.top;
-                }
+                newLeft += referenceRect.left - containerRect.left;
+                newTop += referenceRect.top - containerRect.top;
             }
 
             textElement.style.left = `${(newLeft / containerRect.width) * 100}%`;
@@ -147,9 +130,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Função para detectar orientação da imagem
+    function getImageOrientation(img) {
+        return new Promise((resolve) => {
+            const image = new Image();
+            image.onload = () => {
+                const isVertical = image.height > image.width;
+                resolve(isVertical ? 'vertical' : 'horizontal');
+            };
+            image.src = img.src;
+        });
+    }
+
     // ========== FUNCIONALIDADES DE TEXTO ==========
     // Adicionar novo texto
-    addTextBtn.addEventListener('click', (e) => {
+    addTextBtn.addEventListener('click', async (e) => {
         const existingText = document.querySelector('.draggable-text');
         if (existingText) {
             return;
@@ -158,14 +153,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const isMobile = isMobileDevice();
         let x = '50%';
         let y = '50%';
-        
+
+        // Determinar a orientação da imagem e ajustar a posição inicial do texto
+        if (imagePreview.style.display === 'block') {
+            const orientation = await getImageOrientation(imagePreview);
+            if (orientation === 'vertical') {
+                x = '50%'; // Centro horizontal
+                y = '30%'; // Mais próximo do topo
+            } else {
+                x = '50%'; // Centro horizontal
+                y = '50%'; // Centro vertical
+            }
+        }
+
         if (isMobile && e.type === 'touchstart') {
             const touch = e.touches[0];
             const rect = imagePreview.getBoundingClientRect();
             x = `${((touch.clientX - rect.left) / rect.width) * 100}%`;
             y = `${((touch.clientY - rect.top) / rect.height) * 100}%`;
         }
-        
+
         addTextElement('', x, y);
     });
 
@@ -562,11 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
         adjustTextPosition();
     });
 
-    chooseFileBtn.addEventListener('click', () => {
-        fileInput.click();
-    });
-
-    fileInput.addEventListener('change', (e) => {
+    chooseFileBtn.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file && file.type.match('image.*')) {
             const reader = new FileReader();
@@ -647,33 +650,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 img.src = currentImage;
             });
             
-            const isVertical = isVerticalImage(img);
-            const aspectRatio = img.width / img.height;
-            
-            // Ajustar dimensões do canvas para manter a proporção da imagem
-            if (isVertical) {
-                canvas.height = img.height;
-                canvas.width = img.width;
-            } else {
-                canvas.width = img.width;
-                canvas.height = img.height;
-            }
-            
+            canvas.width = img.width;
+            canvas.height = img.height;
             const ctx = canvas.getContext('2d');
+            
             ctx.filter = imagePreview.style.filter || 'none';
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            
-            const containerRect = mediaContainer.getBoundingClientRect();
-            const imgPreviewRect = imagePreview.getBoundingClientRect();
-            
-            // Calcular escala para mapear coordenadas da visualização para o canvas
-            const scaleX = canvas.width / imgPreviewRect.width;
-            const scaleY = canvas.height / imgPreviewRect.height;
-            const scale = isVertical ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
-            
-            // Ajustar offsets para centralizar a imagem no canvas, se necessário
-            const offsetX = isVertical ? 0 : (containerRect.width - imgPreviewRect.width) / 2;
-            const offsetY = isVertical ? 0 : (containerRect.height - imgPreviewRect.height) / 2;
             
             const textElements = document.querySelectorAll('.draggable-text');
             textElements.forEach(textElement => {
@@ -686,43 +668,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 const leftPercent = parseFloat(textElement.style.left) / 100;
                 const topPercent = parseFloat(textElement.style.top) / 100;
                 
-                let x, y;
-                if (isVertical) {
-                    // Para imagens verticais, usar proporção exata da imagem
-                    x = leftPercent * canvas.width;
-                    y = topPercent * canvas.height;
-                } else {
-                    // Para imagens horizontais, manter comportamento original
-                    const textRect = textElement.getBoundingClientRect();
-                    const relativeX = textRect.left - imgPreviewRect.left + (textRect.width / 2);
-                    const relativeY = textRect.top - imgPreviewRect.top + (textRect.height / 2);
-                    x = relativeX * scaleX;
-                    y = relativeY * scaleY;
-                }
+                const x = leftPercent * canvas.width;
+                const y = topPercent * canvas.height;
                 
-                const scaledFontSize = fontSize * scale;
+                const imgPreviewRect = imagePreview.getBoundingClientRect();
+                const scaleX = canvas.width / imgPreviewRect.width;
+                const scaleY = canvas.height / imgPreviewRect.height;
+                const scaledFontSize = fontSize * Math.min(scaleX, scaleY);
                 
-                ctx.font = `${scaledFontSize}px ${fontFamily}`;
-                ctx.fillStyle = color;
-                ctx.textAlign = textAlign;
-                ctx.textBaseline = 'middle';
-
                 const transform = textElement.style.transform.match(/scale\(([^)]+)\)|rotate\(([^)]+)\)/g) || [];
-                let textScale = 1;
+                let scale = 1;
                 let rotation = 0;
                 transform.forEach(t => {
                     if (t.includes('scale')) {
-                        textScale = parseFloat(t.match(/scale\(([^)]+)\)/)[1]) || 1;
+                        scale = parseFloat(t.match(/scale\(([^)]+)\)/)[1]) || 1;
                     }
                     if (t.includes('rotate')) {
                         rotation = parseFloat(t.match(/rotate\(([^)]+)\)/)[1]) || 0;
                     }
                 });
-
+                
+                ctx.font = `${scaledFontSize}px ${fontFamily}`;
+                ctx.fillStyle = color;
+                ctx.textAlign = textAlign;
+                ctx.textBaseline = 'middle';
+                
                 ctx.save();
                 ctx.translate(x, y);
                 ctx.rotate(rotation * Math.PI / 180);
-                ctx.scale(textScale, textScale);
+                ctx.scale(scale, scale);
                 ctx.fillText(text, 0, 0);
                 ctx.restore();
             });
