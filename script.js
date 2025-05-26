@@ -47,7 +47,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentFilterIntensity = 100;
     let isCameraActive = false;
     let currentFacingMode = 'environment';
-    let baseFontSize = 24; // Tamanho base da fonte para cálculo proporcional
 
     // Função para verificar se é dispositivo móvel
     function isMobileDevice() {
@@ -73,6 +72,11 @@ document.addEventListener('DOMContentLoaded', function() {
     observer.observe(imagePreview, { attributes: true, attributeFilter: ['style'] });
     observer.observe(cameraView, { attributes: true, attributeFilter: ['style'] });
 
+    // Função para verificar se a imagem é vertical
+    function isVerticalImage(img) {
+        return img.height > img.width;
+    }
+
     // Função para ajustar a orientação da câmera
     function adjustCameraOrientation() {
         if (!isCameraActive || !isMobileDevice()) return;
@@ -89,52 +93,57 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para ajustar o texto quando a orientação muda
-    function adjustTextOnOrientationChange() {
+    // Função para ajustar a posição do texto
+    function adjustTextPosition() {
+        if (!isMobileDevice()) return;
+
         const textElements = document.querySelectorAll('.draggable-text');
         if (textElements.length === 0) return;
 
         const containerRect = mediaContainer.getBoundingClientRect();
-        const imgRect = imagePreview.getBoundingClientRect();
-        const isImageMode = imagePreview.style.display === 'block';
-        const referenceRect = isImageMode ? imgRect : containerRect;
-
-        // Calcular fator de escala baseado na mudança de orientação
-        const scaleFactor = Math.min(
-            referenceRect.width / containerRect.width,
-            referenceRect.height / containerRect.height
-        );
+        const imgPreviewRect = imagePreview.getBoundingClientRect();
 
         textElements.forEach(textElement => {
-            // Manter a posição relativa
             const leftPercent = parseFloat(textElement.style.left) / 100;
             const topPercent = parseFloat(textElement.style.top) / 100;
-            
-            const newLeft = leftPercent * containerRect.width;
-            const newTop = topPercent * containerRect.height;
-            
+
+            const isImageMode = imagePreview.style.display === 'block';
+            const referenceRect = isImageMode ? imgPreviewRect : containerRect;
+
+            let newLeft = leftPercent * referenceRect.width;
+            let newTop = topPercent * referenceRect.height;
+
+            if (isImageMode) {
+                const img = new Image();
+                img.src = imagePreview.src;
+                const isVertical = img.height > img.width;
+                if (isVertical) {
+                    // Ajustar para manter a proporção exata da imagem vertical
+                    const scaleX = referenceRect.width / img.width;
+                    const scaleY = referenceRect.height / img.height;
+                    const scale = Math.min(scaleX, scaleY);
+                    newLeft = (leftPercent * img.width * scale) + (referenceRect.left - containerRect.left);
+                    newTop = (topPercent * img.height * scale) + (referenceRect.top - containerRect.top);
+                } else {
+                    newLeft += referenceRect.left - containerRect.left;
+                    newTop += referenceRect.top - containerRect.top;
+                }
+            }
+
             textElement.style.left = `${(newLeft / containerRect.width) * 100}%`;
             textElement.style.top = `${(newTop / containerRect.height) * 100}%`;
-            
-            // Ajustar tamanho da fonte proporcionalmente
-            if (textElement.dataset.originalFontSize) {
-                const originalSize = parseFloat(textElement.dataset.originalFontSize);
-                textElement.style.fontSize = `${originalSize * scaleFactor}px`;
-            }
         });
     }
 
     // Evento de mudança de orientação
     if (isMobileDevice()) {
         window.addEventListener('orientationchange', () => {
-            setTimeout(() => {
-                adjustCameraOrientation();
-                adjustTextOnOrientationChange();
-            }, 300);
+            adjustCameraOrientation();
+            adjustTextPosition();
         });
         window.addEventListener('resize', () => {
             adjustCameraOrientation();
-            adjustTextOnOrientationChange();
+            adjustTextPosition();
         });
     }
 
@@ -167,19 +176,7 @@ document.addEventListener('DOMContentLoaded', function() {
         textElement.contentEditable = true;
         textElement.textContent = initialText;
         textElement.style.color = textColor.value;
-        
-        // Calcular tamanho da fonte proporcional
-        const containerRect = mediaContainer.getBoundingClientRect();
-        const imgRect = imagePreview.getBoundingClientRect();
-        const isImageMode = imagePreview.style.display === 'block';
-        const referenceRect = isImageMode ? imgRect : containerRect;
-        const scaleFactor = Math.min(
-            referenceRect.width / containerRect.width,
-            referenceRect.height / containerRect.height
-        );
-        
-        textElement.style.fontSize = `${baseFontSize * scaleFactor}px`;
-        textElement.dataset.originalFontSize = baseFontSize.toString();
+        textElement.style.fontSize = '24px';
         textElement.style.fontFamily = fonts[currentFontIndex];
         textElement.style.textAlign = alignments[currentAlignIndex].name;
         textElement.style.left = x;
@@ -449,6 +446,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     cameraView.style.maxWidth = '100%';
                     cameraView.style.maxHeight = '100%';
                     adjustCameraOrientation();
+                    adjustTextPosition();
                 };
                 
                 showStatus("Câmera ativada. Use os botões para capturar, alternar ou sair.", 'info');
@@ -509,6 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addTextBtn.disabled = false;
         
         showStatus("Foto capturada. Clique em 'Enviar para o Drive'.", 'info');
+        adjustTextPosition();
     });
 
     switchCameraBtn.addEventListener('click', async () => {
@@ -537,6 +536,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cameraView.style.maxWidth = '100%';
                 cameraView.style.maxHeight = '100%';
                 adjustCameraOrientation();
+                adjustTextPosition();
             };
             
             showStatus(`Câmera alternada para ${currentFacingMode === 'environment' ? 'traseira' : 'frontal'}.`, 'info');
@@ -559,6 +559,7 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBtn.disabled = true;
         addTextBtn.disabled = true;
         resetStatus();
+        adjustTextPosition();
     });
 
     chooseFileBtn.addEventListener('click', () => {
@@ -579,15 +580,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 cameraMenu.style.display = 'none';
                 mediaContainer.classList.remove('fullscreen');
                 
-                // Quando a imagem terminar de carregar
-                imagePreview.onload = function() {
-                    // Ajustar texto para a nova imagem
-                    const textElements = document.querySelectorAll('.draggable-text');
-                    if (textElements.length > 0) {
-                        adjustTextOnOrientationChange();
-                    }
-                };
-                
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                     stream = null;
@@ -597,6 +589,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 addTextBtn.disabled = false;
                 
                 showStatus("Imagem selecionada. Clique em 'Enviar para o Drive'.", 'info');
+                adjustTextPosition();
             };
             reader.readAsDataURL(file);
         } else {
@@ -654,23 +647,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 img.src = currentImage;
             });
             
-            // Definir o tamanho do canvas com base na imagem original
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            const ctx = canvas.getContext('2d');
+            const isVertical = isVerticalImage(img);
+            const aspectRatio = img.width / img.height;
             
-            // Aplicar filtro à imagem
+            // Ajustar dimensões do canvas para manter a proporção da imagem
+            if (isVertical) {
+                canvas.height = img.height;
+                canvas.width = img.width;
+            } else {
+                canvas.width = img.width;
+                canvas.height = img.height;
+            }
+            
+            const ctx = canvas.getContext('2d');
             ctx.filter = imagePreview.style.filter || 'none';
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             
-            // Obter as dimensões da imagem exibida na tela
-            const imgRect = imagePreview.getBoundingClientRect();
+            const containerRect = mediaContainer.getBoundingClientRect();
+            const imgPreviewRect = imagePreview.getBoundingClientRect();
             
-            // Calcular a proporção entre a imagem exibida e a original
-            const displayRatio = Math.min(
-                imgRect.width / img.naturalWidth,
-                imgRect.height / img.naturalHeight
-            );
+            // Calcular escala para mapear coordenadas da visualização para o canvas
+            const scaleX = canvas.width / imgPreviewRect.width;
+            const scaleY = canvas.height / imgPreviewRect.height;
+            const scale = isVertical ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
+            
+            // Ajustar offsets para centralizar a imagem no canvas, se necessário
+            const offsetX = isVertical ? 0 : (containerRect.width - imgPreviewRect.width) / 2;
+            const offsetY = isVertical ? 0 : (containerRect.height - imgPreviewRect.height) / 2;
             
             const textElements = document.querySelectorAll('.draggable-text');
             textElements.forEach(textElement => {
@@ -680,28 +683,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 const fontFamily = textElement.style.fontFamily || 'Arial';
                 const textAlign = textElement.style.textAlign || 'center';
                 
-                // Obter a posição do texto em relação à imagem exibida
-                const textRect = textElement.getBoundingClientRect();
+                const leftPercent = parseFloat(textElement.style.left) / 100;
+                const topPercent = parseFloat(textElement.style.top) / 100;
                 
-                // Calcular a posição central do texto em relação à imagem
-                const centerX = (textRect.left + textRect.width/2 - imgRect.left) / displayRatio;
-                const centerY = (textRect.top + textRect.height/2 - imgRect.top) / displayRatio;
+                let x, y;
+                if (isVertical) {
+                    // Para imagens verticais, usar proporção exata da imagem
+                    x = leftPercent * canvas.width;
+                    y = topPercent * canvas.height;
+                } else {
+                    // Para imagens horizontais, manter comportamento original
+                    const textRect = textElement.getBoundingClientRect();
+                    const relativeX = textRect.left - imgPreviewRect.left + (textRect.width / 2);
+                    const relativeY = textRect.top - imgPreviewRect.top + (textRect.height / 2);
+                    x = relativeX * scaleX;
+                    y = relativeY * scaleY;
+                }
                 
-                // Ajustar o tamanho da fonte para a imagem original
-                const scaledFontSize = fontSize / displayRatio;
+                const scaledFontSize = fontSize * scale;
                 
                 ctx.font = `${scaledFontSize}px ${fontFamily}`;
                 ctx.fillStyle = color;
                 ctx.textAlign = textAlign;
                 ctx.textBaseline = 'middle';
 
-                // Aplicar transformações (escala e rotação)
                 const transform = textElement.style.transform.match(/scale\(([^)]+)\)|rotate\(([^)]+)\)/g) || [];
-                let scale = 1;
+                let textScale = 1;
                 let rotation = 0;
                 transform.forEach(t => {
                     if (t.includes('scale')) {
-                        scale = parseFloat(t.match(/scale\(([^)]+)\)/)[1]) || 1;
+                        textScale = parseFloat(t.match(/scale\(([^)]+)\)/)[1]) || 1;
                     }
                     if (t.includes('rotate')) {
                         rotation = parseFloat(t.match(/rotate\(([^)]+)\)/)[1]) || 0;
@@ -709,9 +720,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 ctx.save();
-                ctx.translate(centerX, centerY);
+                ctx.translate(x, y);
                 ctx.rotate(rotation * Math.PI / 180);
-                ctx.scale(scale, scale);
+                ctx.scale(textScale, textScale);
                 ctx.fillText(text, 0, 0);
                 ctx.restore();
             });
