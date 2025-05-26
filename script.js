@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Page elements
+    // Elementos da página
     const toggleCameraBtn = document.getElementById('toggleCamera');
     const uploadBtn = document.getElementById('uploadBtn');
     const chooseFileBtn = document.getElementById('chooseFile');
@@ -18,19 +18,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const exitCameraBtn = document.getElementById('exitCamera');
     const mediaContainer = document.querySelector('.media-container');
 
-    // Filter elements
+    // Elementos dos filtros
     const filtersContainer = document.getElementById('filtersContainer');
     const filterBtns = document.querySelectorAll('.filter-btn');
     const filterIntensity = document.getElementById('filterIntensity');
 
-    // Text editor elements
+    // Elementos do editor de texto
     const textToolbar = document.getElementById('textToolbar');
     const textColor = document.getElementById('textColor');
     const changeFont = document.getElementById('changeFont');
     const changeAlign = document.getElementById('changeAlign');
     const finishText = document.getElementById('finishText');
 
-    // Global variables
+    // Variáveis globais
     let stream = null;
     let currentImage = null;
     const scriptUrl = "https://script.google.com/macros/s/AKfycbx_QNWJB10INetzQBj9mV3spD8qlhO4xFgsmXE_WGkUVKOkOOut_7hle7QY4aTZnDNv2w/exec";
@@ -48,23 +48,23 @@ document.addEventListener('DOMContentLoaded', function() {
     let isCameraActive = false;
     let currentFacingMode = 'environment';
 
-    // Check if device is mobile
+    // Função para verificar se é dispositivo móvel
     function isMobileDevice() {
         return /Mobi|Android|iPhone|iPad|iPod|Touch/.test(navigator.userAgent);
     }
 
-    // Enable text button when image is present
+    // Habilitar botão de texto quando houver imagem
     function checkImageForText() {
         addTextBtn.disabled = !(imagePreview.style.display === 'block');
     }
 
-    // Show/hide filters when image is present
+    // Mostrar/ocultar filtros quando houver imagem
     function toggleFilters() {
         const hasImage = imagePreview.style.display === 'block';
         filtersContainer.style.display = hasImage ? 'block' : 'none';
     }
 
-    // Observe image changes
+    // Observar mudanças na imagem
     const observer = new MutationObserver(function() {
         checkImageForText();
         toggleFilters();
@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     observer.observe(imagePreview, { attributes: true, attributeFilter: ['style'] });
     observer.observe(cameraView, { attributes: true, attributeFilter: ['style'] });
 
-    // Adjust camera orientation
+    // Função para ajustar a orientação da câmera
     function adjustCameraOrientation() {
         if (!isCameraActive || !isMobileDevice()) return;
 
@@ -88,71 +88,84 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Adjust text position relative to image
+    // Função para ajustar a posição do texto na mudança de orientação
     function adjustTextPosition() {
-        const textElements = document.querySelectorAll('.draggable-text');
-        if (textElements.length === 0 || imagePreview.style.display !== 'block') return;
+        if (!isMobileDevice()) return;
 
+        const textElements = document.querySelectorAll('.draggable-text');
+        if (textElements.length === 0) return;
+
+        const containerRect = mediaContainer.getBoundingClientRect();
         const imgPreviewRect = imagePreview.getBoundingClientRect();
 
         textElements.forEach(textElement => {
-            const leftPercent = parseFloat(textElement.dataset.leftPercent) || 50;
-            const topPercent = parseFloat(textElement.dataset.topPercent) || 50;
+            const leftPercent = parseFloat(textElement.style.left) / 100;
+            const topPercent = parseFloat(textElement.style.top) / 100;
 
-            textElement.style.left = `${leftPercent}%`;
-            textElement.style.top = `${topPercent}%`;
+            const isImageMode = imagePreview.style.display === 'block';
+            const referenceRect = isImageMode ? imgPreviewRect : containerRect;
+
+            let newLeft = leftPercent * referenceRect.width;
+            let newTop = topPercent * referenceRect.height;
+
+            if (isImageMode) {
+                newLeft += referenceRect.left - containerRect.left;
+                newTop += referenceRect.top - containerRect.top;
+            }
+
+            textElement.style.left = `${(newLeft / containerRect.width) * 100}%`;
+            textElement.style.top = `${(newTop / containerRect.height) * 100}%`;
         });
     }
 
-    // Handle orientation and resize events
+    // Evento de mudança de orientação
     if (isMobileDevice()) {
         window.addEventListener('orientationchange', () => {
-            setTimeout(adjustTextPosition, 100);
             adjustCameraOrientation();
+            adjustTextPosition();
         });
         window.addEventListener('resize', () => {
-            setTimeout(adjustTextPosition, 100);
             adjustCameraOrientation();
+            adjustTextPosition();
         });
     }
 
-    // ========== TEXT FUNCTIONALITY ==========
-    // Add new text
+    // ========== FUNCIONALIDADES DE TEXTO ==========
+    // Adicionar novo texto
     addTextBtn.addEventListener('click', (e) => {
-        if (document.querySelector('.draggable-text')) {
-            return; // Only one text element allowed, like Instagram
+        const existingText = document.querySelector('.draggable-text');
+        if (existingText) {
+            return;
         }
 
         const isMobile = isMobileDevice();
-        let x = 50;
-        let y = 50;
-
+        let x = '50%';
+        let y = '50%';
+        
         if (isMobile && e.type === 'touchstart') {
             const touch = e.touches[0];
             const rect = imagePreview.getBoundingClientRect();
-            x = ((touch.clientX - rect.left) / rect.width) * 100;
-            y = ((touch.clientY - rect.top) / rect.height) * 100;
+            x = `${((touch.clientX - rect.left) / rect.width) * 100}%`;
+            y = `${((touch.clientY - rect.top) / rect.height) * 100}%`;
         }
-
+        
         addTextElement('', x, y);
     });
 
-    // Create text element
-    function addTextElement(initialText, x = 50, y = 50) {
+    // Criar elemento de texto
+    function addTextElement(initialText, x = '50%', y = '50%') {
         const textElement = document.createElement('div');
         textElement.className = 'draggable-text text-active';
         textElement.contentEditable = true;
-        textElement.textContent = initialText || 'Digite seu texto';
+        textElement.textContent = initialText;
         textElement.style.color = textColor.value;
         textElement.style.fontSize = '24px';
         textElement.style.fontFamily = fonts[currentFontIndex];
         textElement.style.textAlign = alignments[currentAlignIndex].name;
-        textElement.style.left = `${x}%`;
-        textElement.style.top = `${y}%`;
+        textElement.style.left = x;
+        textElement.style.top = y;
         textElement.style.transform = 'translate(-50%, -50%)';
         textElement.style.whiteSpace = 'pre-wrap';
-        textElement.dataset.leftPercent = x;
-        textElement.dataset.topPercent = y;
 
         makeTextManipulable(textElement);
 
@@ -175,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function() {
         textElement.focus();
     }
 
-    // Select text element
+    // Selecionar elemento de texto
     function selectTextElement(element) {
         if (activeTextElement) {
             activeTextElement.classList.remove('text-active');
@@ -197,12 +210,14 @@ document.addEventListener('DOMContentLoaded', function() {
         changeAlign.innerHTML = `<i class="fas ${alignments[currentAlignIndex].icon}"></i>`;
     }
 
-    // Make text manipulable (drag, pinch, rotate)
+    // Tornar elemento manipulável
     function makeTextManipulable(element) {
         let isDragging = false;
         let isPinching = false;
         let initialX = 0;
         let initialY = 0;
+        let currentX = 0;
+        let currentY = 0;
         let initialDistance = 0;
         let initialAngle = 0;
         let currentScale = 1;
@@ -243,11 +258,13 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (e.type === 'touchstart' || e.type === 'mousedown') {
                 isDragging = true;
                 const event = e.type === 'touchstart' ? e.touches[0] : e;
-                const rect = imagePreview.getBoundingClientRect();
-                const leftPercent = parseFloat(element.dataset.leftPercent) || 50;
-                const topPercent = parseFloat(element.dataset.topPercent) || 50;
-                initialX = event.clientX - (leftPercent / 100) * rect.width;
-                initialY = event.clientY - (topPercent / 100) * rect.height;
+                const rect = mediaContainer.getBoundingClientRect();
+                const leftPercent = parseFloat(element.style.left) / 100;
+                const topPercent = parseFloat(element.style.top) / 100;
+                currentX = leftPercent * rect.width;
+                currentY = topPercent * rect.height;
+                initialX = event.clientX - currentX;
+                initialY = event.clientY - currentY;
                 element.classList.add('dragging');
             }
 
@@ -262,7 +279,8 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             e.stopPropagation();
 
-            const rect = imagePreview.getBoundingClientRect();
+            const rect = mediaContainer.getBoundingClientRect();
+            const elementRect = element.getBoundingClientRect();
 
             if (isPinching && e.type === 'touchmove' && e.touches.length === 2) {
                 const touch1 = e.touches[0];
@@ -288,17 +306,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentRotation = newRotation;
             } else if (isDragging) {
                 const event = e.type === 'touchmove' ? e.touches[0] : e;
-                let newX = (event.clientX - initialX) / rect.width * 100;
-                let newY = (event.clientY - initialY) / rect.height * 100;
+                let newX = event.clientX - initialX;
+                let newY = event.clientY - initialY;
 
-                // Constrain text within image bounds
-                newX = Math.max(0, Math.min(newX, 100));
-                newY = Math.max(0, Math.min(newY, 100));
+                const minX = 0;
+                const minY = 0;
+                const maxX = rect.width - elementRect.width;
+                const maxY = rect.height - elementRect.height;
 
-                element.style.left = `${newX}%`;
-                element.style.top = `${newY}%`;
-                element.dataset.leftPercent = newX;
-                element.dataset.topPercent = newY;
+                newX = Math.max(minX, Math.min(newX, maxX));
+                newY = Math.max(minY, Math.min(newY, maxY));
+
+                currentX = newX;
+                currentY = newY;
+                element.style.left = `${(newX / rect.width) * 100}%`;
+                element.style.top = `${(newY / rect.height) * 100}%`;
             }
         }
 
@@ -355,7 +377,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     mediaContainer.addEventListener('click', (e) => {
-        if (e.target === mediaContainer || e.target === imagePreview) {
+        if (e.target === mediaContainer) {
             if (activeTextElement) {
                 activeTextElement.classList.remove('text-active');
                 activeTextElement.contentEditable = false;
@@ -375,7 +397,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return "#" + hex(match[1]) + hex(match[2]) + hex(match[3]);
     }
 
-    // ========== CAMERA AND IMAGE FUNCTIONALITY ==========
+    // ========== FUNCIONALIDADES DE CÂMERA E IMAGEM ==========
     toggleCameraBtn.addEventListener('click', async () => {
         if (!isCameraActive) {
             try {
@@ -613,7 +635,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const ctx = canvas.getContext('2d');
             
             ctx.filter = imagePreview.style.filter || 'none';
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            
+            const containerRect = mediaContainer.getBoundingClientRect();
+            const imgPreviewRect = imagePreview.getBoundingClientRect();
+            
+            const offsetX = (containerRect.width - imgPreviewRect.width) / 2;
+            const offsetY = (containerRect.height - imgPreviewRect.height) / 2;
+            
+            const scaleX = canvas.width / imgPreviewRect.width;
+            const scaleY = canvas.height / imgPreviewRect.height;
             
             const textElements = document.querySelectorAll('.draggable-text');
             textElements.forEach(textElement => {
@@ -623,13 +654,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 const fontFamily = textElement.style.fontFamily || 'Arial';
                 const textAlign = textElement.style.textAlign || 'center';
                 
-                const leftPercent = parseFloat(textElement.dataset.leftPercent) || 50;
-                const topPercent = parseFloat(textElement.dataset.topPercent) || 50;
+                const textRect = textElement.getBoundingClientRect();
                 
-                const x = (leftPercent / 100) * canvas.width;
-                const y = (topPercent / 100) * canvas.height;
+                const relativeX = textRect.left - imgPreviewRect.left + (textRect.width / 2);
+                const relativeY = textRect.top - imgPreviewRect.top + (textRect.height / 2);
                 
-                ctx.font = `${fontSize}px ${fontFamily}`;
+                const x = relativeX * scaleX;
+                const y = relativeY * scaleY;
+                const scaledFontSize = fontSize * Math.min(scaleX, scaleY);
+                
+                ctx.font = `${scaledFontSize}px ${fontFamily}`;
                 ctx.fillStyle = color;
                 ctx.textAlign = textAlign;
                 ctx.textBaseline = 'middle';
@@ -754,7 +788,7 @@ document.addEventListener('DOMContentLoaded', function() {
         progressText.textContent = `${Math.round(percent)}%`;
     }
 
-    // Initialize
+    // Inicializar
     addTextBtn.disabled = true;
     uploadBtn.disabled = true;
 });
