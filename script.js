@@ -97,24 +97,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const containerRect = mediaContainer.getBoundingClientRect();
         const imgPreviewRect = imagePreview.getBoundingClientRect();
+        const isImageMode = imagePreview.style.display === 'block';
+
+        if (!isImageMode) return; // Só ajusta se a imagem estiver visível
 
         textElements.forEach(textElement => {
+            // Obter as coordenadas atuais do texto em porcentagem
             const leftPercent = parseFloat(textElement.style.left) / 100;
             const topPercent = parseFloat(textElement.style.top) / 100;
 
-            const isImageMode = imagePreview.style.display === 'block';
-            const referenceRect = isImageMode ? imgPreviewRect : containerRect;
+            // Calcular a posição relativa do texto em relação à imagem
+            const imgLeftOffset = imgPreviewRect.left - containerRect.left;
+            const imgTopOffset = imgPreviewRect.top - containerRect.top;
 
-            let newLeft = leftPercent * referenceRect.width;
-            let newTop = topPercent * referenceRect.height;
+            // Converter a posição percentual do container para pixels relativos à imagem
+            const textXInContainer = leftPercent * containerRect.width;
+            const textYInContainer = topPercent * containerRect.height;
 
-            if (isImageMode) {
-                newLeft += referenceRect.left - containerRect.left;
-                newTop += referenceRect.top - containerRect.top;
-            }
+            // Ajustar a posição para ser relativa à imagem, considerando o deslocamento
+            const textXInImage = textXInContainer - imgLeftOffset;
+            const textYInImage = textYInContainer - imgTopOffset;
 
-            textElement.style.left = `${(newLeft / containerRect.width) * 100}%`;
-            textElement.style.top = `${(newTop / containerRect.height) * 100}%`;
+            // Converter a posição para porcentagem em relação às dimensões da imagem
+            const newLeftPercent = (textXInImage / imgPreviewRect.width) * 100;
+            const newTopPercent = (textYInImage / imgPreviewRect.height) * 100;
+
+            // Atualizar as coordenadas do texto
+            textElement.style.left = `${newLeftPercent}%`;
+            textElement.style.top = `${newTopPercent}%`;
+
+            // Ajustar a transformação para manter o texto centralizado
+            textElement.style.transform = 'translate(-50%, -50%)';
         });
     }
 
@@ -145,8 +158,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isMobile && e.type === 'touchstart') {
             const touch = e.touches[0];
             const rect = imagePreview.getBoundingClientRect();
-            x = `${((touch.clientX - rect.left) / rect.width) * 100}%`;
-            y = `${((touch.clientY - rect.top) / rect.height) * 100}%`;
+            const containerRect = mediaContainer.getBoundingClientRect();
+            const imgLeftOffset = rect.left - containerRect.left;
+            const imgTopOffset = rect.top - containerRect.top;
+            const imgWidth = rect.width;
+            const imgHeight = rect.height;
+            x = `${((touch.clientX - rect.left) / imgWidth) * 100}%`;
+            y = `${((touch.clientY - rect.top) / imgHeight) * 100}%`;
         }
         
         addTextElement('', x, y);
@@ -162,8 +180,22 @@ document.addEventListener('DOMContentLoaded', function() {
         textElement.style.fontSize = '24px';
         textElement.style.fontFamily = fonts[currentFontIndex];
         textElement.style.textAlign = alignments[currentAlignIndex].name;
-        textElement.style.left = x;
-        textElement.style.top = y;
+
+        // Ajustar posição inicial para ser relativa à imagem
+        const isMobile = isMobileDevice();
+        if (isMobile && imagePreview.style.display === 'block') {
+            const rect = imagePreview.getBoundingClientRect();
+            const containerRect = mediaContainer.getBoundingClientRect();
+            const imgLeftOffset = rect.left - containerRect.left;
+            const imgTopOffset = rect.top - containerRect.top;
+            const imgWidth = rect.width;
+            const imgHeight = rect.height;
+            textElement.style.left = `${(parseFloat(x) / 100) * imgWidth + imgLeftOffset}%`;
+            textElement.style.top = `${(parseFloat(y) / 100) * imgHeight + imgTopOffset}%`;
+        } else {
+            textElement.style.left = x;
+            textElement.style.top = y;
+        }
         textElement.style.transform = 'translate(-50%, -50%)';
         textElement.style.whiteSpace = 'pre-wrap';
 
