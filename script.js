@@ -68,9 +68,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const observer = new MutationObserver(function() {
         checkImageForText();
         toggleFilters();
+        updateAllTextPositions();
     });
-    observer.observe(imagePreview, { attributes: true, attributeFilter: ['style'] });
-    observer.observe(cameraView, { attributes: true, attributeFilter: ['style'] });
+    observer.observe(imagePreview, { attributes: true, attributeFilter: ['style', 'src'] });
 
     // Função para ajustar a orientação da câmera
     function adjustCameraOrientation() {
@@ -80,80 +80,49 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isLandscape) {
             cameraView.classList.add('landscape');
             cameraView.style.objectFit = 'cover';
-            cameraView.style.transform = 'translate(-50%, -50%)';
         } else {
             cameraView.classList.remove('landscape');
             cameraView.style.objectFit = 'contain';
-            cameraView.style.transform = 'translate(-50%, -50%)';
         }
     }
 
-    // Função para ajustar a posição do texto na mudança de orientação
-    function adjustTextPosition() {
-        if (!isMobileDevice()) return;
-
-        const textElements = document.querySelectorAll('.draggable-text');
-        if (textElements.length === 0) return;
-
+    // Atualizar posições de texto
+    function updateTextCSSPosition(element) {
+        const imgRect = imagePreview.getBoundingClientRect();
         const containerRect = mediaContainer.getBoundingClientRect();
-        const imgPreviewRect = imagePreview.getBoundingClientRect();
-
-        textElements.forEach(textElement => {
-            const leftPercent = parseFloat(textElement.style.left) / 100;
-            const topPercent = parseFloat(textElement.style.top) / 100;
-
-            const isImageMode = imagePreview.style.display === 'block';
-            const referenceRect = isImageMode ? imgPreviewRect : containerRect;
-
-            let newLeft = leftPercent * referenceRect.width;
-            let newTop = topPercent * referenceRect.height;
-
-            if (isImageMode) {
-                newLeft += referenceRect.left - containerRect.left;
-                newTop += referenceRect.top - containerRect.top;
-            }
-
-            textElement.style.left = `${(newLeft / containerRect.width) * 100}%`;
-            textElement.style.top = `${(newTop / containerRect.height) * 100}%`;
-        });
+        const relX = parseFloat(element.dataset.relX) || 0.5;
+        const relY = parseFloat(element.dataset.relY) || 0.5;
+        const left = (imgRect.left - containerRect.left + relX * imgRect.width) / containerRect.width * 100;
+        const top = (imgRect.top - containerRect.top + relY * imgRect.height) / containerRect.height * 100;
+        element.style.left = `${left}%`;
+        element.style.top = `${top}%`;
     }
 
-    // Evento de mudança de orientação
+    function updateAllTextPositions() {
+        document.querySelectorAll('.draggable-text').forEach(updateTextCSSPosition);
+    }
+
+    // Evento de resize
+    window.addEventListener('resize', () => {
+        adjustCameraOrientation();
+        updateAllTextPositions();
+    });
     if (isMobileDevice()) {
         window.addEventListener('orientationchange', () => {
             adjustCameraOrientation();
-            adjustTextPosition();
-        });
-        window.addEventListener('resize', () => {
-            adjustCameraOrientation();
-            adjustTextPosition();
+            updateAllTextPositions();
         });
     }
 
-    // ========== FUNCIONALIDADES DE TEXTO ==========
     // Adicionar novo texto
-    addTextBtn.addEventListener('click', (e) => {
+    addTextBtn.addEventListener('click', () => {
         const existingText = document.querySelector('.draggable-text');
-        if (existingText) {
-            return;
-        }
-
-        const isMobile = isMobileDevice();
-        let x = '50%';
-        let y = '50%';
-        
-        if (isMobile && e.type === 'touchstart') {
-            const touch = e.touches[0];
-            const rect = imagePreview.getBoundingClientRect();
-            x = `${((touch.clientX - rect.left) / rect.width) * 100}%`;
-            y = `${((touch.clientY - rect.top) / rect.height) * 100}%`;
-        }
-        
-        addTextElement('', x, y);
+        if (existingText) return;
+        addTextElement('Digite aqui');
     });
 
     // Criar elemento de texto
-    function addTextElement(initialText, x = '50%', y = '50%') {
+    function addTextElement(initialText) {
         const textElement = document.createElement('div');
         textElement.className = 'draggable-text text-active';
         textElement.contentEditable = true;
@@ -162,19 +131,18 @@ document.addEventListener('DOMContentLoaded', function() {
         textElement.style.fontSize = '24px';
         textElement.style.fontFamily = fonts[currentFontIndex];
         textElement.style.textAlign = alignments[currentAlignIndex].name;
-        textElement.style.left = x;
-        textElement.style.top = y;
+        textElement.style.position = 'absolute';
         textElement.style.transform = 'translate(-50%, -50%)';
         textElement.style.whiteSpace = 'pre-wrap';
+        textElement.dataset.relX = 0.5;
+        textElement.dataset.relY = 0.5;
 
         makeTextManipulable(textElement);
 
         textElement.addEventListener('click', (e) => {
             e.stopPropagation();
             selectTextElement(textElement);
-            if (isMobileDevice()) {
-                textElement.focus();
-            }
+            if (isMobileDevice()) textElement.focus();
         });
 
         textElement.addEventListener('touchstart', (e) => {
@@ -184,6 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, { passive: false });
 
         mediaContainer.appendChild(textElement);
+        updateTextCSSPosition(textElement);
         selectTextElement(textElement);
         textElement.focus();
     }
@@ -200,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
         textToolbar.style.display = 'block';
 
         textColor.value = rgbToHex(element.style.color) || '#000000';
-        const fontFamily = element.style.fontFamily || 'Arial';
+        const fontFamily = element.style.fontFamily.replace(/['"]/g, '') || 'Arial';
         currentFontIndex = fonts.indexOf(fontFamily);
         if (currentFontIndex === -1) currentFontIndex = 0;
         changeFont.textContent = fonts[currentFontIndex];
@@ -213,123 +182,43 @@ document.addEventListener('DOMContentLoaded', function() {
     // Tornar elemento manipulável
     function makeTextManipulable(element) {
         let isDragging = false;
-        let isPinching = false;
-        let initialX = 0;
-        let initialY = 0;
-        let currentX = 0;
-        let currentY = 0;
-        let initialDistance = 0;
-        let initialAngle = 0;
-        let currentScale = 1;
-        let currentRotation = 0;
-
-        function getTransform() {
-            const transform = element.style.transform.match(/scale\(([^)]+)\)|rotate\(([^)]+)\)/g) || [];
-            transform.forEach(t => {
-                if (t.includes('scale')) {
-                    currentScale = parseFloat(t.match(/scale\(([^)]+)\)/)[1]) || 1;
-                }
-                if (t.includes('rotate')) {
-                    currentRotation = parseFloat(t.match(/rotate\(([^)]+)\)/)[1]) || 0;
-                }
-            });
-        }
+        let initialRelX = 0;
+        let initialRelY = 0;
+        let initialMouseX = 0;
+        let initialMouseY = 0;
 
         function startManipulation(e) {
             e.preventDefault();
             e.stopPropagation();
-
-            const isMobile = isMobileDevice();
-            getTransform();
-
-            if (isMobile && e.type === 'touchstart' && e.touches.length === 2) {
-                isPinching = true;
-                const touch1 = e.touches[0];
-                const touch2 = e.touches[1];
-                initialDistance = Math.hypot(
-                    touch1.clientX - touch2.clientX,
-                    touch1.clientY - touch2.clientY
-                );
-                initialAngle = Math.atan2(
-                    touch2.clientY - touch1.clientY,
-                    touch2.clientX - touch1.clientX
-                );
-                element.classList.add('dragging');
-            } else if (e.type === 'touchstart' || e.type === 'mousedown') {
-                isDragging = true;
-                const event = e.type === 'touchstart' ? e.touches[0] : e;
-                const rect = mediaContainer.getBoundingClientRect();
-                const leftPercent = parseFloat(element.style.left) / 100;
-                const topPercent = parseFloat(element.style.top) / 100;
-                currentX = leftPercent * rect.width;
-                currentY = topPercent * rect.height;
-                initialX = event.clientX - currentX;
-                initialY = event.clientY - currentY;
-                element.classList.add('dragging');
-            }
-
-            element.style.userSelect = 'none';
-            document.body.style.userSelect = 'none';
-            element.style.cursor = isPinching ? 'grabbing' : 'move';
+            isDragging = true;
+            const event = e.type === 'touchstart' ? e.touches[0] : e;
+            initialMouseX = event.clientX;
+            initialMouseY = event.clientY;
+            initialRelX = parseFloat(element.dataset.relX) || 0.5;
+            initialRelY = parseFloat(element.dataset.relY) || 0.5;
+            element.classList.add('dragging');
         }
 
         function manipulate(e) {
-            if (!isDragging && !isPinching) return;
-
+            if (!isDragging) return;
             e.preventDefault();
             e.stopPropagation();
 
-            const rect = mediaContainer.getBoundingClientRect();
-            const elementRect = element.getBoundingClientRect();
-
-            if (isPinching && e.type === 'touchmove' && e.touches.length === 2) {
-                const touch1 = e.touches[0];
-                const touch2 = e.touches[1];
-                const currentDistance = Math.hypot(
-                    touch1.clientX - touch2.clientX,
-                    touch1.clientY - touch2.clientY
-                );
-                const currentAngle = Math.atan2(
-                    touch2.clientY - touch1.clientY,
-                    touch2.clientX - touch1.clientX
-                );
-
-                const scaleFactor = currentDistance / initialDistance;
-                const newScale = Math.max(0.5, Math.min(currentScale * scaleFactor, 3));
-                const angleDiff = (currentAngle - initialAngle) * (180 / Math.PI);
-                const newRotation = currentRotation + angleDiff;
-
-                element.style.transform = `translate(-50%, -50%) scale(${newScale}) rotate(${newRotation}deg)`;
-                initialDistance = currentDistance;
-                initialAngle = currentAngle;
-                currentScale = newScale;
-                currentRotation = newRotation;
-            } else if (isDragging) {
-                const event = e.type === 'touchmove' ? e.touches[0] : e;
-                let newX = event.clientX - initialX;
-                let newY = event.clientY - initialY;
-
-                const minX = 0;
-                const minY = 0;
-                const maxX = rect.width - elementRect.width;
-                const maxY = rect.height - elementRect.height;
-
-                newX = Math.max(minX, Math.min(newX, maxX));
-                newY = Math.max(minY, Math.min(newY, maxY));
-
-                currentX = newX;
-                currentY = newY;
-                element.style.left = `${(newX / rect.width) * 100}%`;
-                element.style.top = `${(newY / rect.height) * 100}%`;
-            }
+            const event = e.type === 'touchmove' ? e.touches[0] : e;
+            const dx = event.clientX - initialMouseX;
+            const dy = event.clientY - initialMouseY;
+            const imgRect = imagePreview.getBoundingClientRect();
+            let relX = initialRelX + dx / imgRect.width;
+            let relY = initialRelY + dy / imgRect.height;
+            relX = Math.max(0, Math.min(1, relX));
+            relY = Math.max(0, Math.min(1, relY));
+            element.dataset.relX = relX;
+            element.dataset.relY = relY;
+            updateTextCSSPosition(element);
         }
 
         function stopManipulation() {
             isDragging = false;
-            isPinching = false;
-            element.style.userSelect = '';
-            document.body.style.userSelect = '';
-            element.style.cursor = 'move';
             element.classList.remove('dragging');
         }
 
@@ -346,25 +235,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     textColor.addEventListener('input', () => {
-        if (activeTextElement) {
-            activeTextElement.style.color = textColor.value;
-        }
+        if (activeTextElement) activeTextElement.style.color = textColor.value;
     });
 
     changeFont.addEventListener('click', () => {
         currentFontIndex = (currentFontIndex + 1) % fonts.length;
         changeFont.textContent = fonts[currentFontIndex];
-        if (activeTextElement) {
-            activeTextElement.style.fontFamily = fonts[currentFontIndex];
-        }
+        if (activeTextElement) activeTextElement.style.fontFamily = fonts[currentFontIndex];
     });
 
     changeAlign.addEventListener('click', () => {
         currentAlignIndex = (currentAlignIndex + 1) % alignments.length;
         changeAlign.innerHTML = `<i class="fas ${alignments[currentAlignIndex].icon}"></i>`;
-        if (activeTextElement) {
-            activeTextElement.style.textAlign = alignments[currentAlignIndex].name;
-        }
+        if (activeTextElement) activeTextElement.style.textAlign = alignments[currentAlignIndex].name;
     });
 
     finishText.addEventListener('click', () => {
@@ -388,7 +271,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function rgbToHex(rgb) {
-        if (!rgb) return '#000000';
+        if (!rgb || !rgb.startsWith('rgb')) return '#000000';
         const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
         if (!match) return rgb;
         function hex(x) {
@@ -397,42 +280,29 @@ document.addEventListener('DOMContentLoaded', function() {
         return "#" + hex(match[1]) + hex(match[2]) + hex(match[3]);
     }
 
-    // ========== FUNCIONALIDADES DE CÂMERA E IMAGEM ==========
+    // Funcionalidades de câmera e imagem
     toggleCameraBtn.addEventListener('click', async () => {
         if (!isCameraActive) {
             try {
                 resetStatus();
                 placeholder.style.display = 'none';
                 imagePreview.style.display = 'none';
-                
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
                         facingMode: currentFacingMode,
                         width: { ideal: 1920 },
                         height: { ideal: 1080 }
-                    } 
+                    }
                 });
-                
                 cameraView.srcObject = stream;
                 cameraView.style.display = 'block';
                 cameraMenu.style.display = 'block';
                 mediaContainer.classList.add('fullscreen');
                 uploadBtn.disabled = true;
                 addTextBtn.disabled = true;
-                
                 isCameraActive = true;
                 adjustCameraOrientation();
-                
-                cameraView.onloadedmetadata = () => {
-                    cameraView.style.width = '100%';
-                    cameraView.style.height = '100%';
-                    cameraView.style.maxWidth = '100%';
-                    cameraView.style.maxHeight = '100%';
-                    adjustCameraOrientation();
-                    adjustTextPosition();
-                };
-                
-                showStatus("Câmera ativada. Use os botões para capturar, alternar ou sair.", 'info');
+                showStatus("Câmera ativada.", 'info');
             } catch (err) {
                 showError("Erro ao acessar a câmera: " + err.message);
                 mediaContainer.classList.remove('fullscreen');
@@ -442,55 +312,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     capturePhotoBtn.addEventListener('click', () => {
         const canvas = document.createElement('canvas');
-        const videoWidth = cameraView.videoWidth;
-        const videoHeight = cameraView.videoHeight;
-        
-        canvas.width = videoWidth;
-        canvas.height = videoHeight;
-        
+        canvas.width = cameraView.videoWidth;
+        canvas.height = cameraView.videoHeight;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(cameraView, 0, 0, canvas.width, canvas.height);
-        
-        cameraView.style.transition = '0.3s';
+
         cameraView.style.filter = 'brightness(2)';
-        setTimeout(() => {
-            cameraView.style.filter = 'brightness(1)';
-        }, 300);
-        
+        setTimeout(() => cameraView.style.filter = 'brightness(1)', 300);
+
         currentImage = canvas.toDataURL('image/jpeg', 0.9);
         imagePreview.src = currentImage;
         imagePreview.style.display = 'block';
         cameraView.style.display = 'none';
         cameraMenu.style.display = 'none';
         mediaContainer.classList.remove('fullscreen');
-        
-        const containerRect = mediaContainer.getBoundingClientRect();
-        const aspectRatio = videoWidth / videoHeight;
-        let newWidth = containerRect.width;
-        let newHeight = newWidth / aspectRatio;
-        
-        if (newHeight > containerRect.height) {
-            newHeight = containerRect.height;
-            newWidth = newHeight * aspectRatio;
-        }
-        
-        imagePreview.style.width = `${newWidth}px`;
-        imagePreview.style.height = `${newHeight}px`;
-        imagePreview.style.maxWidth = '100%';
-        imagePreview.style.maxHeight = '100%';
-        imagePreview.style.transform = 'translate(-50%, -50%)';
-        
+
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
         }
-        
+
         isCameraActive = false;
         uploadBtn.disabled = false;
         addTextBtn.disabled = false;
-        
-        showStatus("Foto capturada. Clique em 'Enviar para o Drive'.", 'info');
-        adjustTextPosition();
+        showStatus("Foto capturada.", 'info');
+        updateAllTextPositions();
     });
 
     switchCameraBtn.addEventListener('click', async () => {
@@ -498,30 +344,17 @@ document.addEventListener('DOMContentLoaded', function() {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
         }
-        
         currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-        
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: {
                     facingMode: currentFacingMode,
                     width: { ideal: 1920 },
                     height: { ideal: 1080 }
-                } 
+                }
             });
-            
             cameraView.srcObject = stream;
             cameraView.style.display = 'block';
-            
-            cameraView.onloadedmetadata = () => {
-                cameraView.style.width = '100%';
-                cameraView.style.height = '100%';
-                cameraView.style.maxWidth = '100%';
-                cameraView.style.maxHeight = '100%';
-                adjustCameraOrientation();
-                adjustTextPosition();
-            };
-            
             showStatus(`Câmera alternada para ${currentFacingMode === 'environment' ? 'traseira' : 'frontal'}.`, 'info');
         } catch (err) {
             showError("Erro ao alternar câmera: " + err.message);
@@ -533,7 +366,6 @@ document.addEventListener('DOMContentLoaded', function() {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
         }
-        
         cameraView.style.display = 'none';
         cameraMenu.style.display = 'none';
         placeholder.style.display = 'flex';
@@ -542,12 +374,9 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBtn.disabled = true;
         addTextBtn.disabled = true;
         resetStatus();
-        adjustTextPosition();
     });
 
-    chooseFileBtn.addEventListener('click', () => {
-        fileInput.click();
-    });
+    chooseFileBtn.addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -562,21 +391,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 cameraView.style.display = 'none';
                 cameraMenu.style.display = 'none';
                 mediaContainer.classList.remove('fullscreen');
-                
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                     stream = null;
                 }
-                
                 uploadBtn.disabled = false;
                 addTextBtn.disabled = false;
-                
-                showStatus("Imagem selecionada. Clique em 'Enviar para o Drive'.", 'info');
-                adjustTextPosition();
+                showStatus("Imagem selecionada.", 'info');
+                updateAllTextPositions();
             };
             reader.readAsDataURL(file);
         } else {
-            showError("Por favor, selecione um arquivo de imagem válido.");
+            showError("Selecione um arquivo de imagem válido.");
         }
     });
 
@@ -591,16 +417,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function applyFilter() {
         if (!currentImage) return;
-        
         const intensity = currentFilterIntensity / 100;
-        let filterValue = currentFilter;
-        
-        if (currentFilter !== 'none') {
-            filterValue = currentFilter.replace(/([\d.]+)(%|px|deg)/g, (match, number, unit) => {
-                return `${parseFloat(number) * intensity}${unit}`;
-            });
-        }
-        
+        let filterValue = currentFilter === 'none' ? 'none' : currentFilter.replace(/([\d.]+)(%|px|deg)/g, (match, number, unit) => {
+            return `${parseFloat(number) * intensity}${unit}`;
+        });
         imagePreview.style.filter = filterValue;
     }
 
@@ -614,54 +434,42 @@ document.addEventListener('DOMContentLoaded', function() {
             showError("Nenhuma imagem para enviar");
             return;
         }
-        
         try {
             uploadBtn.disabled = true;
             showStatus("Enviando imagem...", 'info');
             progressContainer.style.display = 'block';
-            
             simulateUploadProgress();
-            
+
             const canvas = document.createElement('canvas');
             const img = new Image();
-            
-            await new Promise((resolve) => {
-                img.onload = resolve;
-                img.src = currentImage;
-            });
-            
+            await new Promise(resolve => { img.onload = resolve; img.src = currentImage; });
             canvas.width = img.width;
             canvas.height = img.height;
             const ctx = canvas.getContext('2d');
-            
             ctx.filter = imagePreview.style.filter || 'none';
             ctx.drawImage(img, 0, 0);
-            
+
             const textElements = document.querySelectorAll('.draggable-text');
             textElements.forEach(el => {
                 const text = el.textContent;
                 const color = el.style.color || '#000';
                 const fontSize = parseInt(el.style.fontSize) || 24;
-                const fontFamily = el.style.fontFamily || 'Arial';
+                const fontFamily = el.style.fontFamily.replace(/['"]/g, '') || 'Arial';
                 const textAlign = el.style.textAlign || 'center';
-                
-                const relX = parseFloat(el.style.left) / 100;
-                const relY = parseFloat(el.style.top) / 100;
-                
+                const relX = parseFloat(el.dataset.relX) || 0.5;
+                const relY = parseFloat(el.dataset.relY) || 0.5;
                 const x = relX * canvas.width;
                 const y = relY * canvas.height;
-                
+
                 const previewRect = imagePreview.getBoundingClientRect();
                 const scale = canvas.width / previewRect.width;
                 const scaledFont = fontSize * scale;
-                
+
                 ctx.save();
                 ctx.translate(x, y);
-                
                 const tf = el.style.transform.match(/rotate\(([^)]+)\)/);
                 const rotation = tf ? parseFloat(tf[1]) * Math.PI / 180 : 0;
                 ctx.rotate(rotation);
-                
                 ctx.font = `${scaledFont}px ${fontFamily}`;
                 ctx.fillStyle = color;
                 ctx.textAlign = textAlign;
@@ -669,29 +477,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.fillText(text, 0, 0);
                 ctx.restore();
             });
-            
+
             const finalImage = canvas.toDataURL('image/jpeg', 0.8);
             const base64Data = finalImage.split(',')[1];
-            
+
             const response = await fetch(scriptUrl, {
                 method: 'POST',
                 body: base64Data
             });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
+
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const result = await response.json();
-            
+
             if (result.success) {
-                showStatus(`Imagem enviada com sucesso como ${result.fileName}!`, 'success');
+                showStatus(`Imagem enviada como ${result.fileName}!`, 'success');
                 uploadBtn.disabled = true;
                 currentImage = null;
-                
-                setTimeout(() => {
-                    resetInterface();
-                }, 5000);
+                setTimeout(resetInterface, 5000);
             } else {
                 showError("Erro ao enviar: " + (result.error || "Desconhecido"));
                 uploadBtn.disabled = false;
@@ -706,14 +508,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function showStatus(message, type = 'info') {
         statusDiv.textContent = message;
-        statusDiv.className = 'status';
-        
-        if (type === 'success') {
-            statusDiv.classList.add('success');
-        } else if (type === 'error') {
-            statusDiv.classList.add('error');
-        }
-        
+        statusDiv.className = 'status ' + type;
         statusDiv.style.display = 'block';
     }
 
@@ -735,21 +530,17 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBtn.disabled = true;
         addTextBtn.disabled = true;
         fileInput.value = '';
-        
         document.querySelectorAll('.draggable-text').forEach(el => el.remove());
         textToolbar.style.display = 'none';
-        
         imagePreview.style.filter = 'none';
         currentFilter = 'none';
         filterBtns.forEach(b => b.classList.remove('active'));
         document.querySelector('.filter-btn[data-filter="none"]').classList.add('active');
         filterIntensity.value = 100;
-        
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
         }
-        
         isCameraActive = false;
     }
 
@@ -761,13 +552,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 progress = 100;
                 clearInterval(interval);
             }
-            updateProgress(progress);
+            progressBar.style.width = `${progress}%`;
+            progressText.textContent = `${Math.round(progress)}%`;
         }, 300);
-    }
-
-    function updateProgress(percent) {
-        progressBar.style.width = `${percent}%`;
-        progressText.textContent = `${Math.round(percent)}%`;
     }
 
     // Inicializar
