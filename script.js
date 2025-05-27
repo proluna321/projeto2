@@ -167,6 +167,10 @@ document.addEventListener('DOMContentLoaded', function() {
         textElement.style.transform = 'translate(-50%, -50%)';
         textElement.style.whiteSpace = 'pre-wrap';
 
+        // Armazenar coordenadas normalizadas
+        textElement.dataset.relX = parseFloat(x) / 100;
+        textElement.dataset.relY = parseFloat(y) / 100;
+
         makeTextManipulable(textElement);
 
         textElement.addEventListener('click', (e) => {
@@ -331,6 +335,14 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.style.userSelect = '';
             element.style.cursor = 'move';
             element.classList.remove('dragging');
+
+            // Atualizar coordenadas normalizadas após manipulação
+            const imgRect = imagePreview.getBoundingClientRect();
+            const textRect = element.getBoundingClientRect();
+            const centerX = textRect.left + textRect.width / 2;
+            const centerY = textRect.top + textRect.height / 2;
+            element.dataset.relX = (centerX - imgRect.left) / imgRect.width;
+            element.dataset.relY = (centerY - imgRect.top) / imgRect.height;
         }
 
         element.addEventListener('mousedown', startManipulation);
@@ -449,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
         canvas.height = videoHeight;
         
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(cameraView, 0, 0, videoWidth, videoHeight);
+        ctx.drawImage(cameraView, 0, 0, canvas.width, canvas.height);
         
         cameraView.style.transition = '0.3s';
         cameraView.style.filter = 'brightness(2)';
@@ -464,22 +476,20 @@ document.addEventListener('DOMContentLoaded', function() {
         cameraMenu.style.display = 'none';
         mediaContainer.classList.remove('fullscreen');
         
-        // Manter proporções reais na pré-visualização
+        const containerRect = mediaContainer.getBoundingClientRect();
         const aspectRatio = videoWidth / videoHeight;
-        const containerWidth = mediaContainer.offsetWidth;
-        let previewWidth = containerWidth;
-        let previewHeight = previewWidth / aspectRatio;
+        let newWidth = containerRect.width;
+        let newHeight = newWidth / aspectRatio;
         
-        if (previewHeight > mediaContainer.offsetHeight) {
-            previewHeight = mediaContainer.offsetHeight;
-            previewWidth = previewHeight * aspectRatio;
+        if (newHeight > containerRect.height) {
+            newHeight = containerRect.height;
+            newWidth = newHeight * aspectRatio;
         }
         
-        imagePreview.style.width = `${previewWidth}px`;
-        imagePreview.style.height = `${previewHeight}px`;
+        imagePreview.style.width = `${newWidth}px`;
+        imagePreview.style.height = `${newHeight}px`;
         imagePreview.style.maxWidth = '100%';
         imagePreview.style.maxHeight = '100%';
-        imagePreview.style.objectFit = 'contain';
         imagePreview.style.transform = 'translate(-50%, -50%)';
         
         if (stream) {
@@ -624,61 +634,54 @@ document.addEventListener('DOMContentLoaded', function() {
             
             simulateUploadProgress();
             
+            const canvas = document.createElement('canvas');
             const img = new Image();
+            
             await new Promise((resolve) => {
                 img.onload = resolve;
                 img.src = currentImage;
             });
             
-            const canvas = document.createElement('canvas');
             canvas.width = img.width;
             canvas.height = img.height;
             const ctx = canvas.getContext('2d');
             
             ctx.filter = imagePreview.style.filter || 'none';
-            ctx.drawImage(img, 0, 0, img.width, img.height);
+            ctx.drawImage(img, 0, 0);
             
             const textElements = document.querySelectorAll('.draggable-text');
-            textElements.forEach(textElement => {
-                const text = textElement.textContent;
-                const color = textElement.style.color || '#000000';
-                const fontSize = parseInt(textElement.style.fontSize) || 24;
-                const fontFamily = textElement.style.fontFamily || 'Arial';
-                const textAlign = textElement.style.textAlign || 'center';
+            textElements.forEach(el => {
+                const text = el.textContent;
+                const color = el.style.color || '#000';
+                const fontSize = parseInt(el.style.fontSize) || 24;
+                const fontFamily = el.style.fontFamily || 'Arial';
+                const textAlign = el.style.textAlign || 'center';
                 
-                const containerRect = mediaContainer.getBoundingClientRect();
-                const imgPreviewRect = imagePreview.getBoundingClientRect();
-                const textRect = textElement.getBoundingClientRect();
+                // Ler coordenadas normalizadas
+                const relX = parseFloat(el.dataset.relX) || 0.5;
+                const relY = parseFloat(el.dataset.relY) || 0.5;
                 
-                const scaleX = img.width / imgPreviewRect.width;
-                const scaleY = img.height / imgPreviewRect.height;
+                // Calcular coordenadas no canvas
+                const x = relX * canvas.width;
+                const y = relY * canvas.height;
                 
-                const relativeX = (textRect.left - imgPreviewRect.left + (textRect.width / 2)) * scaleX;
-                const relativeY = (textRect.top - imgPreviewRect.top + (textRect.height / 2)) * scaleY;
+                // Escala uniforme
+                const previewRect = imagePreview.getBoundingClientRect();
+                const scale = canvas.width / previewRect.width;
+                const scaledFont = fontSize * scale;
                 
-                const scaledFontSize = fontSize * Math.min(scaleX, scaleY);
+                ctx.save();
+                ctx.translate(x, y);
                 
-                ctx.font = `${scaledFontSize}px ${fontFamily}`;
+                // Aplicar rotação, se existir
+                const tf = el.style.transform.match(/rotate\(([^)]+)\)/);
+                const rotation = tf ? parseFloat(tf[1]) * Math.PI / 180 : 0;
+                ctx.rotate(rotation);
+                
+                ctx.font = `${scaledFont}px ${fontFamily}`;
                 ctx.fillStyle = color;
                 ctx.textAlign = textAlign;
                 ctx.textBaseline = 'middle';
-
-                const transform = textElement.style.transform.match(/scale\(([^)]+)\)|rotate\(([^)]+)\)/g) || [];
-                let scale = 1;
-                let rotation = 0;
-                transform.forEach(t => {
-                    if (t.includes('scale')) {
-                        scale = parseFloat(t.match(/scale\(([^)]+)\)/)[1]) || 1;
-                    }
-                    if (t.includes('rotate')) {
-                        rotation = parseFloat(t.match(/rotate\(([^)]+)\)/)[1]) || 0;
-                    }
-                });
-
-                ctx.save();
-                ctx.translate(relativeX, relativeY);
-                ctx.rotate(rotation * Math.PI / 180);
-                ctx.scale(scale, scale);
                 ctx.fillText(text, 0, 0);
                 ctx.restore();
             });
