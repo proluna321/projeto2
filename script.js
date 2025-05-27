@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function() {
     addTextBtn.addEventListener('click', () => {
         const existingText = document.querySelector('.draggable-text');
         if (existingText) return;
-        addTextElement(''); // Alterado para string vazia
+        addTextElement('');
     });
 
     // Criar elemento de texto
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const textElement = document.createElement('div');
         textElement.className = 'draggable-text text-active';
         textElement.contentEditable = true;
-        textElement.textContent = initialText; // Agora inicializa como vazio
+        textElement.textContent = initialText;
         textElement.style.color = textColor.value;
         textElement.style.fontSize = '24px';
         textElement.style.fontFamily = fonts[currentFontIndex];
@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
         mediaContainer.appendChild(textElement);
         updateTextCSSPosition(textElement);
         selectTextElement(textElement);
-        textElement.focus(); // Garante que o cursor apareça imediatamente
+        textElement.focus();
     }
 
     // Selecionar elemento de texto
@@ -182,43 +182,89 @@ document.addEventListener('DOMContentLoaded', function() {
     // Tornar elemento manipulável
     function makeTextManipulable(element) {
         let isDragging = false;
+        let isMultiTouch = false;
         let initialRelX = 0;
         let initialRelY = 0;
         let initialMouseX = 0;
         let initialMouseY = 0;
+        let initialFontSize = parseFloat(element.style.fontSize) || 24;
+        let initialRotation = 0;
+        let initialDistance = 0;
+        let initialAngle = 0;
+
+        function getTouchDistance(touch1, touch2) {
+            const dx = touch2.clientX - touch1.clientX;
+            const dy = touch2.clientY - touch1.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function getTouchAngle(touch1, touch2) {
+            return Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX) * 180 / Math.PI;
+        }
 
         function startManipulation(e) {
             e.preventDefault();
             e.stopPropagation();
-            isDragging = true;
-            const event = e.type === 'touchstart' ? e.touches[0] : e;
-            initialMouseX = event.clientX;
-            initialMouseY = event.clientY;
-            initialRelX = parseFloat(element.dataset.relX) || 0.5;
-            initialRelY = parseFloat(element.dataset.relY) || 0.5;
-            element.classList.add('dragging');
+
+            const touches = e.touches || [e];
+            if (touches.length === 1) {
+                // Single-finger drag
+                isDragging = true;
+                isMultiTouch = false;
+                initialMouseX = touches[0].clientX;
+                initialMouseY = touches[0].clientY;
+                initialRelX = parseFloat(element.dataset.relX) || 0.5;
+                initialRelY = parseFloat(element.dataset.relY) || 0.5;
+                element.classList.add('dragging');
+            } else if (touches.length === 2) {
+                // Two-finger scale and rotate
+                isDragging = false;
+                isMultiTouch = true;
+                initialFontSize = parseFloat(element.style.fontSize) || 24;
+                initialRotation = element.style.transform.match(/rotate\(([^)]+)\)/) ? 
+                    parseFloat(element.style.transform.match(/rotate\(([^)]+)\)/)[1]) : 0;
+                initialDistance = getTouchDistance(touches[0], touches[1]);
+                initialAngle = getTouchAngle(touches[0], touches[1]);
+                element.classList.add('dragging');
+            }
         }
 
         function manipulate(e) {
-            if (!isDragging) return;
+            if (!isDragging && !isMultiTouch) return;
             e.preventDefault();
             e.stopPropagation();
 
-            const event = e.type === 'touchmove' ? e.touches[0] : e;
-            const dx = event.clientX - initialMouseX;
-            const dy = event.clientY - initialMouseY;
-            const imgRect = imagePreview.getBoundingClientRect();
-            let relX = initialRelX + dx / imgRect.width;
-            let relY = initialRelY + dy / imgRect.height;
-            relX = Math.max(0, Math.min(1, relX));
-            relY = Math.max(0, Math.min(1, relY));
-            element.dataset.relX = relX;
-            element.dataset.relY = relY;
-            updateTextCSSPosition(element);
+            const touches = e.touches || [e];
+            if (isDragging && touches.length === 1) {
+                // Single-finger drag
+                const event = touches[0];
+                const dx = event.clientX - initialMouseX;
+                const dy = event.clientY - initialMouseY;
+                const imgRect = imagePreview.getBoundingClientRect();
+                let relX = initialRelX + dx / imgRect.width;
+                let relY = initialRelY + dy / imgRect.height;
+                relX = Math.max(0, Math.min(1, relX));
+                relY = Math.max(0, Math.min(1, relY));
+                element.dataset.relX = relX;
+                element.dataset.relY = relY;
+                updateTextCSSPosition(element);
+            } else if (isMultiTouch && touches.length === 2) {
+                // Two-finger scale and rotate
+                const currentDistance = getTouchDistance(touches[0], touches[1]);
+                const currentAngle = getTouchAngle(touches[0], touches[1]);
+                const scaleFactor = currentDistance / initialDistance;
+                const newFontSize = Math.max(12, Math.min(100, initialFontSize * scaleFactor));
+                const deltaAngle = currentAngle - initialAngle;
+                const newRotation = initialRotation + deltaAngle;
+
+                element.style.fontSize = `${newFontSize}px`;
+                element.style.transform = `translate(-50%, -50%) rotate(${newRotation}deg)`;
+            }
         }
 
         function stopManipulation() {
             isDragging = false;
+            isMultiTouch = false;
             element.classList.remove('dragging');
         }
 

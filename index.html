@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enviar Foto para o Drive</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <title>Enviar Foto para o Driv</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
@@ -14,9 +13,15 @@
         
         <div class="button-container">
             <div class="button-row">
-                <button id="toggleCamera" class="btn btn-primary" title="Abrir Câmera"><i class="fas fa-camera"></i></button>
-                <button id="chooseFile" class="btn btn-secondary" title="Escolher Imagem"><i class="fas fa-file-image"></i></button>
-                <button id="addTextBtn" class="btn btn-accent" title="Adicionar Texto" disabled><i class="fas fa-font"></i></button>
+                <button id="toggleCamera" class="btn btn-primary" title="Abrir Câmera">
+                    <i class="fas fa-camera"></i>
+                </button>
+                <button id="chooseFile" class="btn btn-secondary" title="Escolher Imagem">
+                    <i class="fas fa-image"></i>
+                </button>
+                <button id="addTextBtn" class="btn btn-accent" title="Adicionar Texto">
+                    <i class="fas fa-font"></i>
+                </button>
             </div>
         </div>
 
@@ -26,14 +31,21 @@
                 <p>Nenhuma imagem selecionada</p>
             </div>
             <video id="cameraView" autoplay playsinline></video>
-            <img id="imagePreview" src="" alt="Pré-visualização da Imagem">
+            <img id="imagePreview" src="" alt="Prévia da Imagem">
+            <input type="file" id="fileInput" accept="image/*">
         </div>
 
         <div class="camera-menu" id="cameraMenu">
             <div class="camera-controls">
-                <button id="capturePhoto" class="btn btn-success" title="Capturar Foto"><i class="fas fa-camera"></i></button>
-                <button id="switchCamera" class="btn btn-secondary" title="Alternar Câmera"><i class="fas fa-sync-alt"></i></button>
-                <button id="exitCamera" class="btn btn-danger" title="Sair da Câmera"><i class="fas fa-times"></i></button>
+                <button id="capturePhoto" class="btn btn-primary" title="Capturar Foto">
+                    <i class="fas fa-camera"></i>
+                </button>
+                <button id="switchCamera" class="btn btn-secondary" title="Alternar Câmera">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button id="exitCamera" class="btn btn-danger" title="Sair da Câmera">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
         </div>
 
@@ -49,14 +61,30 @@
         <div class="filters-container" id="filtersContainer">
             <h3><i class="fas fa-sliders-h"></i> Filtros</h3>
             <div class="filters-scroll">
-                <button class="filter-btn active" data-filter="none"><img src="https://via.placeholder.com/80" class="filter-preview" alt="Sem filtro"></button>
-                <button class="filter-btn" data-filter="grayscale(100%)"><img src="https://via.placeholder.com/80" class="filter-preview" alt="Escala de Cinza"></button>
-                <button class="filter-btn" data-filter="sepia(100%)"><img src="https://via.placeholder.com/80" class="filter-preview" alt="Sépia"></button>
-                <button class="filter-btn" data-filter="brightness(150%)"><img src="https://via.placeholder.com/80" class="filter-preview" alt="Brilho"></button>
-                <button class="filter-btn" data-filter="contrast(150%)"><img src="https://via.placeholder.com/80" class="filter-preview" alt="Contraste"></button>
-                <button class="filter-btn" data-filter="saturate(200%)"><img src="https://via.placeholder.com/80" class="filter-preview" alt="Saturação"></button>
-                <button class="filter-btn" data-filter="hue-rotate(90deg)"><img src="https://via.placeholder.com/80" class="filter-preview" alt="Rotação de Cor"></button>
-                <button class="filter-btn" data-filter="blur(2px)"><img src="https://via.placeholder.com/80" class="filter-preview" alt="Desfocar"></button>
+                <div class="filter-btn" data-filter="none">
+                    <img src="https://via.placeholder.com/80" class="filter-preview" alt="Sem Filtro">
+                </div>
+                <div class="filter-btn" data-filter="grayscale(100%)">
+                    <img src="https://via.placeholder.com/80" class="filter-preview" alt="Escala de Cinza">
+                </div>
+                <div class="filter-btn" data-filter="sepia(100%)">
+                    <img src="https://via.placeholder.com/80" class="filter-preview" alt="Sépia">
+                </div>
+                <div class="filter-btn" data-filter="brightness(150%)">
+                    <img src="https://via.placeholder.com/80" class="filter-preview" alt="Brilho">
+                </div>
+                <div class="filter-btn" data-filter="contrast(150%)">
+                    <img src="https://via.placeholder.com/80" class="filter-preview" alt="Contraste">
+                </div>
+                <div class="filter-btn" data-filter="saturate(200%)">
+                    <img src="https://via.placeholder.com/80" class="filter-preview" alt="Saturação">
+                </div>
+                <div class="filter-btn" data-filter="hue-rotate(90deg)">
+                    <img src="https://via.placeholder.com/80" class="filter-preview" alt="Rotação de Matiz">
+                </div>
+                <div class="filter-btn" data-filter="blur(2px)">
+                    <img src="https://via.placeholder.com/80" class="filter-preview" alt="Desfoque">
+                </div>
             </div>
             <div class="filter-controls">
                 <input type="range" id="filterIntensity" min="0" max="100" value="100" class="filter-slider">
@@ -64,7 +92,9 @@
         </div>
 
         <div class="upload-button-container">
-            <button id="uploadBtn" class="btn btn-success" disabled><i class="fas fa-cloud-upload-alt"></i> Enviar</button>
+            <button id="uploadBtn" class="btn btn-success" disabled>
+                <i class="fas fa-upload"></i> Enviar
+            </button>
         </div>
 
         <div class="status" id="status"></div>
@@ -74,7 +104,6 @@
         </div>
     </div>
 
-    <input type="file" id="fileInput" accept="image/*" style="display: none;">
     <script src="script.js"></script>
 </body>
 </html>
