@@ -167,10 +167,6 @@ document.addEventListener('DOMContentLoaded', function() {
         textElement.style.transform = 'translate(-50%, -50%)';
         textElement.style.whiteSpace = 'pre-wrap';
 
-        // Armazenar coordenadas normalizadas
-        textElement.dataset.relX = parseFloat(x) / 100;
-        textElement.dataset.relY = parseFloat(y) / 100;
-
         makeTextManipulable(textElement);
 
         textElement.addEventListener('click', (e) => {
@@ -335,14 +331,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.style.userSelect = '';
             element.style.cursor = 'move';
             element.classList.remove('dragging');
-
-            // Atualizar coordenadas normalizadas após manipulação
-            const imgRect = imagePreview.getBoundingClientRect();
-            const textRect = element.getBoundingClientRect();
-            const centerX = textRect.left + textRect.width / 2;
-            const centerY = textRect.top + textRect.height / 2;
-            element.dataset.relX = (centerX - imgRect.left) / imgRect.width;
-            element.dataset.relY = (centerY - imgRect.top) / imgRect.height;
         }
 
         element.addEventListener('mousedown', startManipulation);
@@ -657,15 +645,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const fontFamily = el.style.fontFamily || 'Arial';
                 const textAlign = el.style.textAlign || 'center';
                 
-                // Ler coordenadas normalizadas
-                const relX = parseFloat(el.dataset.relX) || 0.5;
-                const relY = parseFloat(el.dataset.relY) || 0.5;
+                const relX = parseFloat(el.style.left) / 100;
+                const relY = parseFloat(el.style.top) / 100;
                 
-                // Calcular coordenadas no canvas
                 const x = relX * canvas.width;
                 const y = relY * canvas.height;
                 
-                // Escala uniforme
                 const previewRect = imagePreview.getBoundingClientRect();
                 const scale = canvas.width / previewRect.width;
                 const scaledFont = fontSize * scale;
@@ -673,7 +658,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.save();
                 ctx.translate(x, y);
                 
-                // Aplicar rotação, se existir
                 const tf = el.style.transform.match(/rotate\(([^)]+)\)/);
                 const rotation = tf ? parseFloat(tf[1]) * Math.PI / 180 : 0;
                 ctx.rotate(rotation);
