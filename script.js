@@ -640,13 +640,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const containerRect = mediaContainer.getBoundingClientRect();
             const imgPreviewRect = imagePreview.getBoundingClientRect();
             
-            // Ajustar offsets considerando a centralização do imagePreview
-            const offsetX = imgPreviewRect.left - containerRect.left + (imgPreviewRect.width / 2);
-            const offsetY = imgPreviewRect.top - containerRect.top + (imgPreviewRect.height / 2);
+            const offsetX = (containerRect.width - imgPreviewRect.width) / 2;
+            const offsetY = (containerRect.height - imgPreviewRect.height) / 2;
             
             const scaleX = canvas.width / imgPreviewRect.width;
             const scaleY = canvas.height / imgPreviewRect.height;
-            const devicePixelRatio = window.devicePixelRatio || 1;
             
             const textElements = document.querySelectorAll('.draggable-text');
             textElements.forEach(textElement => {
@@ -658,16 +656,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const textRect = textElement.getBoundingClientRect();
                 
-                // Ajustar posição considerando a centralização (translate(-50%, -50%))
-                const relativeX = (parseFloat(textElement.style.left) / 100) * imgPreviewRect.width;
-                const relativeY = (parseFloat(textElement.style.top) / 100) * imgPreviewRect.height;
+                const relativeX = textRect.left - imgPreviewRect.left + (textRect.width / 2);
+                const relativeY = textRect.top - imgPreviewRect.top + (textRect.height / 2);
                 
-                // Converter para coordenadas do canvas
-                const x = (relativeX - (textRect.width / 2)) * scaleX;
-                const y = (relativeY - (textRect.height / 2)) * scaleY;
-                
-                // Ajustar o tamanho da fonte com base na escala e devicePixelRatio
-                const scaledFontSize = (fontSize * Math.min(scaleX, scaleY) * devicePixelRatio);
+                const x = relativeX * scaleX;
+                const y = relativeY * scaleY;
+                const scaledFontSize = fontSize * Math.min(scaleX, scaleY);
                 
                 ctx.font = `${scaledFontSize}px ${fontFamily}`;
                 ctx.fillStyle = color;
@@ -687,7 +681,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 ctx.save();
-                ctx.translate(x + (textRect.width * scaleX * scale / 2), y + (textRect.height * scaleY * scale / 2));
+                ctx.translate(x, y);
                 ctx.rotate(rotation * Math.PI / 180);
                 ctx.scale(scale, scale);
                 ctx.fillText(text, 0, 0);
