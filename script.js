@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
             y = `${((touch.clientY - rect.top) / rect.height) * 100}%`;
         }
         
-        addTextElement('', x, y);
+        addTextElement('', x, y); // Usando string vazia como texto inicial
     });
 
     // Criar elemento de texto
@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const textElement = document.createElement('div');
         textElement.className = 'draggable-text text-active';
         textElement.contentEditable = true;
-        textElement.textContent = initialText;
+        textElement.textContent = initialText; // Agora inicializa como vazio
         textElement.style.color = textColor.value;
         textElement.style.fontSize = '24px';
         textElement.style.fontFamily = fonts[currentFontIndex];
@@ -185,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         mediaContainer.appendChild(textElement);
         selectTextElement(textElement);
-        textElement.focus();
+        textElement.focus(); // Garante que o cursor apareça imediatamente
     }
 
     // Selecionar elemento de texto
