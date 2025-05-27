@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function() {
     addTextBtn.addEventListener('click', () => {
         const existingText = document.querySelector('.draggable-text');
         if (existingText) return;
-        addTextElement('Digite aqui');
+        addTextElement(''); // Alterado para string vazia
     });
 
     // Criar elemento de texto
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const textElement = document.createElement('div');
         textElement.className = 'draggable-text text-active';
         textElement.contentEditable = true;
-        textElement.textContent = initialText;
+        textElement.textContent = initialText; // Agora inicializa como vazio
         textElement.style.color = textColor.value;
         textElement.style.fontSize = '24px';
         textElement.style.fontFamily = fonts[currentFontIndex];
@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
         mediaContainer.appendChild(textElement);
         updateTextCSSPosition(textElement);
         selectTextElement(textElement);
-        textElement.focus();
+        textElement.focus(); // Garante que o cursor apareça imediatamente
     }
 
     // Selecionar elemento de texto
