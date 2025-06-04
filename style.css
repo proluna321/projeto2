@@ -419,11 +419,11 @@ h3 {
     cursor: move;
     user-select: none;
     padding: 5px;
-    max-width: 80%;
-    word-break: break-word;
+    max-width: 90%; /* Aumentado para evitar compressão */
+    white-space: nowrap; /* Evita quebras de linha automáticas */
     text-align: center;
-    transition: left 0.1s ease-out, top 0.1s ease-out, transform 0.1s ease-out;
-    caret-color: auto;
+    transition: left 0.1s ease-out, top 0.1s ease-out;
+    overflow: visible; /* Garante que o texto não seja cortado */
 }
 
 .draggable-text.dragging {
@@ -484,7 +484,7 @@ h3 {
 }
 
 .filter-btn {
-    flex: 0 0 auto;
+    flex: 0 0 80px;
     width: 80px;
     height: 80px;
     border-radius: 50%;
@@ -492,7 +492,7 @@ h3 {
     position: relative;
     border: 2px solid transparent;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     background-color: #f5f5f5;
     display: flex;
     align-items: center;
@@ -506,6 +506,64 @@ h3 {
 
 .filter-btn.active {
     border-color: var(--primary-color);
+}
+
+.filter-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
+.filter-icon {
+    position: absolute;
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.filter-btn[data-filter="none"] .filter-preview,
+.filter-btn[data-filter="none"] .filter-icon {
+    filter: none;
+}
+
+.filter-btn[data-filter="grayscale(100%)"] .filter-preview,
+.filter-btn[data-filter="grayscale(100%)"] .filter-icon {
+    filter: grayscale(100%);
+}
+
+.filter-btn[data-filter="sepia(100%)"] .filter-preview,
+.filter-btn[data-filter="sepia(100%)"] .filter-icon {
+    filter: sepia(100%);
+}
+
+.filter-btn[data-filter="brightness(150%)"] .filter-preview,
+.filter-btn[data-filter="brightness(150%)"] .filter-icon {
+    filter: brightness(150%);
+}
+
+.filter-btn[data-filter="contrast(150%)"] .filter-preview,
+.filter-btn[data-filter="contrast(150%)"] .filter-icon {
+    filter: contrast(150%);
+}
+
+.filter-btn[data-filter="saturate(200%)"] .filter-preview,
+.filter-btn[data-filter="saturate(200%)"] .filter-icon {
+    filter: saturate(200%);
+}
+
+.filter-btn[data-filter="hue-rotate(90deg)"] .filter-preview,
+.filter-btn[data-filter="hue-rotate(90deg)"] .filter-icon {
+    filter: hue-rotate(90deg);
+}
+
+.filter-btn[data-filter="blur(2px)"] .filter-preview,
+.filter-btn[data-filter="blur(2px)"] .filter-icon {
+    filter: blur(2px);
 }
 
 .filter-controls {
@@ -544,44 +602,6 @@ h3 {
     cursor: pointer;
 }
 
-.filter-preview {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.filter-btn[data-filter="none"] .filter-preview {
-    filter: none;
-}
-
-.filter-btn[data-filter="grayscale(100%)"] .filter-preview {
-    filter: grayscale(100%);
-}
-
-.filter-btn[data-filter="sepia(100%)"] .filter-preview {
-    filter: sepia(100%);
-}
-
-.filter-btn[data-filter="brightness(150%)"] .filter-preview {
-    filter: brightness(150%);
-}
-
-.filter-btn[data-filter="contrast(150%)"] .filter-preview {
-    filter: contrast(150%);
-}
-
-.filter-btn[data-filter="saturate(200%)"] .filter-preview {
-    filter: saturate(200%);
-}
-
-.filter-btn[data-filter="hue-rotate(90deg)"] .filter-preview {
-    filter: hue-rotate(90deg);
-}
-
-.filter-btn[data-filter="blur(2px)"] .filter-preview {
-    filter: blur(2px);
-}
-
 @media (max-width: 768px) {
     .container {
         padding: 25px;
@@ -615,11 +635,15 @@ h3 {
     .filter-btn {
         width: 90px;
         height: 90px;
-        border-radius: 50%;
+    }
+
+    .filter-icon {
+        width: 70%;
+        height: 70%;
     }
 
     .draggable-text {
-        max-width: 90%;
+        max-width: 95%;
     }
 
     #realTimeText {
@@ -689,7 +713,11 @@ h3 {
     .filter-btn {
         width: 80px;
         height: 80px;
-        border-radius: 50%;
+    }
+
+    .filter-icon {
+        width: 60%;
+        height: 60%;
     }
 
     .camera-menu {
